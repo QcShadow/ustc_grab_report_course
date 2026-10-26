@@ -1,0 +1,87 @@
+# 是否开启成绩自动查询 (默认关闭)
+enable_grade_check: false
+email:
+  # 邮件发送人
+  sender: xx@xx.com                                           # 必须修改
+  # 邮件接收人
+  receiver: xx@xx.com                                         # 必须修改
+  # 需开启SMTP
+  smtp:
+    # SMTP邮件服务器，根据使用的SMTP服务器修改
+    server: smtp.qq.com
+    # SMTP邮件服务器端口号，根据使用的SMTP服务器修改
+    port: 465
+    # SMTP邮件服务器密钥
+    auth_code: xxxxxxxxxxxxxxxxxxxxx                          # 必须修改
+headers:
+  accept: application/json, text/javascript, */*; q=0.01
+  accept-language: en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7,zh-TW;q=0.6,ja;q=0.5
+  content-type: application/x-www-form-urlencoded; charset=UTF-8
+  origin: https://yjs1.ustc.edu.cn
+  priority: u=1, i
+  sec-ch-ua: '"Google Chrome";v="141", "Not?A_Brand";v="8", "Chromium";v="141"'
+  sec-ch-ua-mobile: ?0
+  sec-ch-ua-platform: '"Windows"'
+  sec-fetch-dest: empty
+  sec-fetch-mode: cors
+  sec-fetch-site: same-origin
+  user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML,
+    like Gecko) Chrome/141.0.0.0 Safari/537.36
+  x-requested-with: XMLHttpRequest
+# 针对不同应用的特定 Header (如 Referer)
+app_specific_headers:
+  xsbg:
+    referer: https://yjs1.ustc.edu.cn/gsapp/sys/xsbgglappustc/*default/index.do
+  wdcj:
+    referer: https://yjs1.ustc.edu.cn/gsapp/sys/wdcjapp/*default/index.do
+timeout: 10
+retry_attempts: 3
+base_url: https://yjs1.ustc.edu.cn/gsapp/sys
+urls:
+  search_unselected_report: /xsbgglappustc/modules/xsbgxk/wxbgbgdz.do
+  grab_courses: /xsbgglappustc/xsbgxkController/selectBg.do
+  withdraw_courses: /xsbgglappustc/xsbgxkController/cancelBg.do
+  search_selected_report: /xsbgglappustc/modules/xsbgxk/yxbgbgdz.do
+  check_grade: /wdcjapp/modules/wdcj/xscjcx.do
+data_raw:
+  # 分页查询条件信息
+  '*order': -BGSJ
+  querySetting:
+  - name: YXDM
+    caption: 院系
+    linkOpt: AND
+    builderList: cbl_m_List
+    builder: m_value_equal
+    # 院系编号，多个用逗号分隔（顺序即抢课优先级）
+    value: 229,011,210,010,006,225,A13,221,219
+    # 院系名称，多个用逗号分隔
+    value_display: 人工智能与数据科学学院,计算机科学与技术学院,信息科学技术学院,自动化系,电子工程与信息科学系,软件学院,软件学院合肥,网络空间安全学院,微电子学院
+  - name: '*order'
+    value: -BGSJ
+    linkOpt: AND
+    builder: equal
+  - name: _gotoFirstPage
+    value: true
+    linkOpt: AND
+    builder: equal
+  pageSize: 100
+  pageNumber: 1
+grade_data:
+  querySetting: []
+  pageSize: 20
+  pageNumber: 1
+cookies:
+  GS_DBLOGIN_TOKEN: xxxxxxxxxxxxxxxxxxxxx                     # 必须修改
+  GS_SESSIONID: xxxxxxxxxxxxxxxxxxxxx                         # 必须修改
+  EMAP_LANG: zh                                               # 非必须
+  THEME: blue                                                 # 非必须
+  _WEU: xxxxxxxxxxxxxxxxxxxxx                                 # 必须定时修改(可使用main_update_weu.py)
+  route: xxxxxxxxxxxxxxxxxxxxx                                # 必须修改
+particular_course:
+  # 用于保活cookie中_WEU字段的特殊课程编号
+  BGBM: xxxxxxxxxxxxxxxxxxxxx                                 # 建议设为一个真实的可选人数多且过期距今较久的课程
+interval: 30
+# 每轮最多成功选几门（默认 1，避免一次提交太多报告）
+max_grabs_per_cycle: 1
+# 两场报告开始时间相差小于该值（分钟）视为时间冲突
+conflict_window_minutes: 120
