@@ -1,34 +1,27 @@
-/* USTC report helper - local GUI */
+/* USTC report helper - minimal local GUI */
 "use strict";
 
 let state = null;
 let departments = [];
-let previewData = null;
-let toastTimer = null;
-let logTimer = null;
+let selectedData = null;
+let messageTimer = null;
 
 const $ = (id) => document.getElementById(id);
-const qs = (selector) => document.querySelector(selector);
-const qsa = (selector) => Array.from(document.querySelectorAll(selector));
 
 function esc(value) {
   return String(value == null ? "" : value).replace(/[&<>"']/g, (ch) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;",
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   }[ch]));
 }
 
-function toast(message, type = "info", duration = 4200) {
-  const box = $("toast");
-  box.textContent = message;
-  box.className = "toast show " + (type === "ok" ? "ok" : type === "err" ? "err" : "");
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => {
-    box.className = "toast";
-  }, duration);
+function showMessage(text, type = "info", autoHide = true) {
+  const box = $("message");
+  clearTimeout(messageTimer);
+  box.textContent = text;
+  box.className = `message ${type}`;
+  if (autoHide) {
+    messageTimer = setTimeout(() => box.classList.add("hidden"), type === "err" ? 10000 : 6000);
+  }
 }
 
 async function api(path, options = {}) {
@@ -45,25 +38,9 @@ async function api(path, options = {}) {
     throw new Error(`HTTP ${response.status}`);
   }
   if (!response.ok || data.ok === false) {
-    throw new Error(data.error || `HTTP ${response.status}`);
+    throw new Error(data.error || data.output || `HTTP ${response.status}`);
   }
   return data;
-}
-
-function showDialog(title, html) {
-  $("dialog-title").textContent = title;
-  $("dialog-body").innerHTML = html;
-  $("dialog").classList.remove("hidden");
-}
-
-function hideDialog() {
-  $("dialog").classList.add("hidden");
-}
-
-function switchTab(name) {
-  qsa(".tab").forEach((tab) => tab.classList.toggle("active", tab.dataset.tab === name));
-  qsa(".tab-panel").forEach((panel) => panel.classList.toggle("active", panel.id === `panel-${name}`));
-  if (name === "service") refreshLogs(true);
 }
 
 function setBusy(button, busy, text) {
@@ -85,55 +62,81 @@ function secretHint(inputId, hintId, status) {
   input.value = "";
   if (status && status.set) {
     input.placeholder = `已保存（长度 ${status.length}），留空不修改`;
-    if (hint) {
-      hint.textContent = "已配置";
-      hint.className = "secret ok";
-    }
+    hint.textContent = "已配置";
+    hint.className = "secret ok";
   } else {
     input.placeholder = "未配置";
-    if (hint) {
-      hint.textContent = "未配置";
-      hint.className = "secret bad";
-    }
+    hint.textContent = "未配置";
+    hint.className = "secret bad";
   }
+}
+
+function serviceEnabled() {
+  const service = state && state.service;
+  return Boolean(service && service.installed && service.loaded);
+}
+
+function renderService() {
+  const service = (state && state.service) || {};
+  const pill = $("service-pill");
+  const toggle = $("service-toggle");
+
+  if (!service.supported) {
+    pill.textContent = "手动模式";
+    pill.className = "pill muted";
+    toggle.textContent = "手动运行";
+    toggle.className = "btn";
+    toggle.disabled = true;
+    return;
+  }
+
+  if (service.installed && service.loaded) {
+    pill.textContent = "已启用";
+    pill.className = "pill ok";
+    toggle.textContent = "停止";
+    toggle.className = "btn danger";
+  } else if (service.installed) {
+    pill.textContent = "已停止";
+    pill.className = "pill bad";
+    toggle.textContent = "启用自动抢课";
+    toggle.className = "btn primary";
+  } else {
+    pill.textContent = "未安装";
+    pill.className = "pill muted";
+    toggle.textContent = "启用自动抢课";
+    toggle.className = "btn primary";
+  }
+  toggle.disabled = false;
+}
+
+function updateStatusLine() {
+  if (!state) return;
+  const service = state.service || {};
+  const parts = [];
+
+  if (!service.supported) {
+    parts.push("当前平台请手动运行");
+  } else if (service.installed && service.loaded) {
+    parts.push("自动抢课已启用");
+    if (service.runs != null) parts.push(`已运行 ${service.runs} 次`);
+    if (service.last_exit != null) parts.push(`上次退出码 ${service.last_exit}`);
+  } else if (service.installed) {
+    parts.push("自动抢课已停止");
+  } else {
+    parts.push("自动抢课未启用");
+  }
+  parts.push(`每 ${state.schedule_interval_seconds} 秒检测`);
+
+  if (selectedData) {
+    parts.push(`已选 ${(selectedData.selected || []).length} 门`);
+    parts.push(`可抢 ${selectedData.eligible_count || 0} 门`);
+  }
+  $("status-line").textContent = parts.join(" · ");
 }
 
 function renderState(data) {
   state = data;
   departments = (data.departments || []).map((item) => ({ code: item.code, name: item.name }));
-
-  $("platform-badge").textContent = data.platform || "—";
-  const service = data.service || {};
-  let pillText = "未安装";
-  let pillClass = "pill muted";
-  if (!service.supported) {
-    pillText = "手动模式";
-  } else if (service.installed && service.loaded) {
-    pillText = service.running ? "运行中" : "已启用";
-    pillClass = "pill ok";
-  } else if (service.installed) {
-    pillText = "已停止";
-    pillClass = "pill bad";
-  }
-  const pill = $("service-pill");
-  pill.textContent = pillText;
-  pill.className = pillClass;
-
-  $("card-service").textContent = pillText;
-  $("card-service-detail").textContent = service.installed
-    ? `已运行 ${service.runs == null ? "—" : service.runs} 次 · 间隔 ${service.interval || data.schedule_interval_seconds}s`
-    : "尚未安装定时任务";
-  $("card-exit").textContent = service.last_exit == null ? "—" : String(service.last_exit);
-  $("card-runs").textContent = service.runs == null ? "运行次数未知" : `累计 ${service.runs} 次`;
-  if (previewData) {
-    $("card-selected").textContent = String((previewData.selected || []).length);
-    $("card-eligible").textContent = String(previewData.eligible_count == null ? "—" : previewData.eligible_count);
-  }
-
-  const minutes = Math.round((Number(data.schedule_interval_seconds) || 120) / 6) / 10;
-  $("overview-hint").textContent =
-    `${departments.length} 个院系 · 每 ${minutes} 分钟检测 · 每轮最多成功选 ${data.max_grabs_per_cycle} 门 · ` +
-    `成绩查询${data.enable_grade_check ? "开启" : "关闭"} · 冲突窗口 ${data.conflict_window_minutes} 分钟`;
 
   $("email-sender").value = data.email.sender || "";
   $("email-receiver").value = data.email.receiver || "";
@@ -146,23 +149,13 @@ function renderState(data) {
   secretHint("cookie-_WEU", "hint-_WEU", data.secrets._WEU);
   secretHint("cookie-route", "hint-route", data.secrets.route);
 
-  $("cookie-EMAP_LANG").value = data.optional_cookies.EMAP_LANG || "";
-  $("cookie-THEME").value = data.optional_cookies.THEME || "";
-
   $("enable-grade-check").checked = Boolean(data.enable_grade_check);
-  $("max-grabs").value = data.max_grabs_per_cycle;
-  $("conflict-window").value = data.conflict_window_minutes;
   $("schedule-interval").value = data.schedule_interval_seconds;
-  $("page-size").value = data.page_size;
-  $("enable-keepalive").checked = Boolean(data.enable_keepalive);
-  $("particular-bgbm").value = data.particular_bgbm || "";
-  $("exclude-list").value = (data.exclude || []).join("\n");
-
   $("config-path").textContent = data.config_path || "—";
-  $("save-hint").textContent = "配置已加载";
 
   renderDepartments();
-  renderServiceDetail(data);
+  renderService();
+  updateStatusLine();
 }
 
 function renderDepartments() {
@@ -222,7 +215,7 @@ function moveDepartment(index, delta) {
 
 function removeDepartment(index) {
   if (departments.length <= 1) {
-    toast("至少保留一个院系", "err");
+    showMessage("至少保留一个院系", "err", false);
     return;
   }
   departments.splice(index, 1);
@@ -230,30 +223,11 @@ function removeDepartment(index) {
 }
 
 function addDepartment() {
-  const select = $("department-select");
-  const code = select.value;
+  const code = $("department-select").value;
   if (!code) return;
-  const known = (state && state.known_departments) || [];
-  const found = known.find((item) => item.code === code);
+  const found = ((state && state.known_departments) || []).find((item) => item.code === code);
   if (!found) return;
   departments.push({ code: found.code, name: found.name });
-  renderDepartments();
-}
-
-function addCustomDepartment() {
-  const code = $("custom-code").value.trim();
-  const name = $("custom-name").value.trim();
-  if (!code || !name) {
-    toast("请填写院系代码和名称", "err");
-    return;
-  }
-  if (departments.some((item) => item.code === code)) {
-    toast("该院系代码已存在", "err");
-    return;
-  }
-  departments.push({ code, name });
-  $("custom-code").value = "";
-  $("custom-name").value = "";
   renderDepartments();
 }
 
@@ -275,18 +249,10 @@ function collectPayload() {
       GS_SESSIONID: $("cookie-GS_SESSIONID").value.trim(),
       _WEU: $("cookie-_WEU").value.trim(),
       route: $("cookie-route").value.trim(),
-      EMAP_LANG: $("cookie-EMAP_LANG").value.trim(),
-      THEME: $("cookie-THEME").value.trim(),
     },
     departments: departments.map((item) => ({ code: item.code, name: item.name })),
-    particular_bgbm: $("particular-bgbm").value.trim(),
     enable_grade_check: $("enable-grade-check").checked,
-    enable_keepalive: $("enable-keepalive").checked,
-    max_grabs_per_cycle: number("max-grabs", 1),
-    conflict_window_minutes: number("conflict-window", 120),
     schedule_interval_seconds: number("schedule-interval", 120),
-    page_size: number("page-size", 999),
-    exclude: $("exclude-list").value.split("\n").map((line) => line.trim()).filter(Boolean),
   };
 }
 
@@ -296,261 +262,103 @@ async function saveConfig(showMessage = true) {
   try {
     const data = await api("/api/config", { method: "POST", body: collectPayload() });
     renderState(data);
-    $("save-hint").textContent = "刚刚已保存";
-    if (showMessage) toast("配置已保存", "ok");
+    if (showMessage) showMessage("配置已保存", "ok");
     return data;
   } finally {
     setBusy(button, false);
   }
 }
 
-async function refreshState(showMessage = false) {
-  try {
-    const data = await api("/api/state");
-    renderState(data);
-    if (showMessage) toast("状态已刷新", "ok");
-  } catch (error) {
-    toast(error.message, "err");
-  }
-}
-
-function renderServiceDetail(data) {
-  const service = data.service || {};
-  const info = [
-    ["平台", data.platform],
-    ["配置目录", data.home],
-    ["服务", service.supported === false ? "当前平台仅支持手动运行" : service.installed ? (service.loaded ? "已加载" : "已安装但未加载") : "未安装"],
-    ["上次退出码", service.last_exit == null ? "—" : String(service.last_exit)],
-    ["运行次数", service.runs == null ? "—" : String(service.runs)],
-    ["检测间隔", `${data.schedule_interval_seconds} 秒`],
-    ["任务标识", service.label || "—"],
-  ];
-  if (service.last_run) info.push(["上次运行", service.last_run]);
-  if (service.next_run) info.push(["下次运行", service.next_run]);
-  $("service-detail").innerHTML = info
-    .map(([key, value]) => `<dt>${esc(key)}</dt><dd>${esc(value)}</dd>`)
-    .join("");
-}
-
-async function refreshLogs(silent = false) {
-  try {
-    const data = await api("/api/logs?lines=300");
-    const output = $("log-output");
-    output.textContent = data.text || "（暂无日志）";
-    output.scrollTop = output.scrollHeight;
-  } catch (error) {
-    if (!silent) toast(error.message, "err");
-  }
-}
-
-async function testPlatform() {
-  const button = $("btn-test-platform");
-  setBusy(button, true, "测试中…");
-  try {
-    const result = await api("/api/test/platform", { method: "POST", body: {} });
-    const departments = (result.departments || [])
-      .slice(0, 12)
-      .map((item) => `<li>${esc(item.name)}（${esc(item.code)}）：${item.count} 条</li>`)
-      .join("");
-    showDialog(
-      "平台连接正常",
-      `<p>返回 ${result.rows} 条记录，totalSize=${esc(result.total_size)}。</p>
-       <p class="hint">院系分布（前 12）：</p><ul>${departments || "<li>无</li>"}</ul>`
-    );
-  } catch (error) {
-    toast(error.message, "err");
-  } finally {
-    setBusy(button, false);
-  }
-}
-
-async function testSmtp() {
-  const button = $("btn-test-smtp");
-  setBusy(button, true, "测试中…");
-  try {
-    const result = await api("/api/test/smtp", { method: "POST", body: {} });
-    showDialog("SMTP 测试", `<p>${esc(result.message)}</p>`);
-  } catch (error) {
-    toast(error.message, "err");
-  } finally {
-    setBusy(button, false);
-  }
-}
-
-async function testEmail() {
-  if (!window.confirm("发送一封测试邮件到收件邮箱？")) return;
-  const button = $("btn-test-email");
-  setBusy(button, true, "发送中…");
-  try {
-    const result = await api("/api/test/email", { method: "POST", body: {} });
-    showDialog("测试邮件", `<p>${esc(result.message)}</p>`);
-  } catch (error) {
-    toast(error.message, "err");
-  } finally {
-    setBusy(button, false);
-  }
-}
-
-function renderPreview(data) {
-  previewData = data;
-  const eligible = data.eligible || [];
+function renderSelected(data) {
+  selectedData = data;
   const selected = data.selected || [];
-  $("card-selected").textContent = String(selected.length);
-  $("card-eligible").textContent = String(data.eligible_count || 0);
+  $("selected-summary").textContent = `已选 ${selected.length} 门 · 可抢 ${data.eligible_count || 0} 门`;
 
-  const summary = [
-    `平台返回 ${data.rows} 条`,
-    `通过筛选 ${data.eligible_count} 条`,
-    `冲突窗口 ${data.conflict_window_minutes} 分钟`,
-  ];
-  if (data.eligible_count > eligible.length) summary.push(`仅展示前 ${eligible.length} 条`);
-  if (data.selected_error) summary.push("已选报告读取失败：" + data.selected_error);
-  $("preview-summary").textContent = summary.join(" · ");
-
-  const body = $("eligible-body");
-  if (!eligible.length) {
-    body.innerHTML = `<tr><td colspan="7" class="empty">当前没有符合条件的报告</td></tr>`;
-  } else {
-    body.innerHTML = eligible.map((row) => {
-      const index = departments.findIndex((item) => item.code === row.YXDM);
-      const priority = index >= 0 ? index + 1 : "—";
-      const remaining = Number(row.KXRS) - Number(row.YXRS || 0);
-      const conflict = row.conflicts_selected;
-      const status = conflict
-        ? '<span class="badge bad">与已选冲突</span>'
-        : '<span class="badge ok">可抢</span>';
-      return `<tr>
-        <td>${esc(priority)}</td>
-        <td>${esc(row.YXDM_DISPLAY)}</td>
-        <td><strong>${esc(row.BGTMZW)}</strong><div class="hint">${esc(row.BGBM)}</div></td>
-        <td>${esc(row.BGSJ)}</td>
-        <td>${esc(row.JZSJ)}</td>
-        <td>${Number.isFinite(remaining) ? remaining : "—"}</td>
-        <td>${status}</td>
-      </tr>`;
-    }).join("");
-  }
-
-  $("selected-summary").textContent = `${selected.length} 门`;
-  const selectedBody = $("selected-body");
+  const body = $("selected-body");
   if (!selected.length) {
-    selectedBody.innerHTML = `<tr><td colspan="5" class="empty">暂无已选报告</td></tr>`;
+    body.innerHTML = `<tr><td colspan="4" class="empty">暂无已选报告</td></tr>`;
   } else {
-    selectedBody.innerHTML = selected.map((row) => `<tr>
+    body.innerHTML = selected.map((row) => `<tr>
       <td>${esc(row.YXDM_DISPLAY)}</td>
       <td>${esc(row.BGTMZW)}</td>
       <td>${esc(row.BGSJ)}</td>
       <td>${esc(row.JZSJ)}</td>
-      <td>${esc(row.DD)}</td>
     </tr>`).join("");
   }
+  if (data.selected_error) {
+    showMessage(`已选报告读取失败：${data.selected_error}`, "err", false);
+  }
+  updateStatusLine();
 }
 
-async function refreshPreview() {
-  const button = $("preview-refresh");
-  const overviewButton = $("btn-preview");
-  setBusy(button, true, "查询中…");
-  setBusy(overviewButton, true, "查询中…");
+async function refreshSelected(silent = false) {
+  const button = $("refresh-selected");
+  setBusy(button, true, "刷新中…");
   try {
     const data = await api("/api/preview", { method: "POST", body: {} });
-    renderPreview(data);
-    switchTab("preview");
-    toast(`查询完成：${data.eligible_count} 门可抢`, data.eligible_count ? "ok" : "info");
+    renderSelected(data);
+    if (!silent) showMessage("已刷新", "ok");
   } catch (error) {
-    toast(error.message, "err");
+    if (!silent) showMessage(error.message, "err", false);
   } finally {
     setBusy(button, false);
-    setBusy(overviewButton, false);
   }
 }
 
-async function serviceAction(path, confirmText) {
-  if (confirmText && !window.confirm(confirmText)) return;
-  const output = $("service-output");
-  output.classList.remove("hidden");
-  output.textContent = "执行中，请稍候…";
-  try {
-    const result = await api(`/api/service/${path}`, { method: "POST", body: {} });
-    output.textContent = result.output || result.message || "完成";
-    if (result.service) {
-      state.service = result.service;
-      renderServiceDetail(state);
-      renderState(state);
+async function toggleService() {
+  if (!state || !state.service) return;
+  const button = $("service-toggle");
+  const service = state.service;
+
+  if (service.installed && service.loaded) {
+    if (!window.confirm("停止自动抢课？配置和数据会保留。")) return;
+    setBusy(button, true, "停止中…");
+    try {
+      const result = await api("/api/service/stop", { method: "POST", body: {} });
+      if (result.service) state.service = result.service;
+      renderService();
+      updateStatusLine();
+      showMessage("自动抢课已停止", "ok");
+    } catch (error) {
+      showMessage(error.message, "err", false);
+    } finally {
+      setBusy(button, false);
     }
-    toast("操作完成", "ok");
-    refreshLogs(true);
-  } catch (error) {
-    output.textContent = error.message;
-    toast(error.message, "err");
+    return;
   }
-}
 
-async function installService() {
-  const button = $("btn-install-service");
-  setBusy(button, true, "安装中…");
+  setBusy(button, true, "启用中…");
   try {
     await saveConfig(false);
-    const result = await api("/api/service/install", { method: "POST", body: {} });
-    $("service-output").classList.remove("hidden");
-    $("service-output").textContent = result.output || "安装完成";
-    if (result.service) {
-      state.service = result.service;
-      renderServiceDetail(state);
-      renderState(state);
-    }
-    toast("定时任务已安装 / 更新", "ok");
-    refreshLogs(true);
+    const interval = Number($("schedule-interval").value) || 120;
+    const result = await api("/api/service/install", {
+      method: "POST",
+      body: { interval_seconds: interval, keepalive: false },
+    });
+    if (result.service) state.service = result.service;
+    renderService();
+    updateStatusLine();
+    showMessage("自动抢课已启用", "ok");
   } catch (error) {
-    toast(error.message, "err");
-    $("service-output").classList.remove("hidden");
-    $("service-output").textContent = error.message;
+    showMessage(error.message, "err", false);
   } finally {
     setBusy(button, false);
   }
 }
 
 function bind() {
-  qsa(".tab").forEach((tab) => tab.addEventListener("click", () => switchTab(tab.dataset.tab)));
-  $("refresh-btn").addEventListener("click", () => refreshState(true));
-  $("save-config").addEventListener("click", () => saveConfig(true).catch((error) => toast(error.message, "err")));
-  $("save-install").addEventListener("click", async () => {
-    if (!window.confirm("保存配置并安装 / 更新定时任务？")) return;
-    await installService();
-  });
+  $("save-config").addEventListener("click", () => saveConfig(true).catch((error) => showMessage(error.message, "err", false)));
+  $("service-toggle").addEventListener("click", toggleService);
+  $("refresh-selected").addEventListener("click", () => refreshSelected(false));
   $("add-department").addEventListener("click", addDepartment);
-  $("add-custom").addEventListener("click", addCustomDepartment);
-  $("btn-test-platform").addEventListener("click", testPlatform);
-  $("btn-test-smtp").addEventListener("click", testSmtp);
-  $("btn-test-email").addEventListener("click", testEmail);
-  $("btn-preview").addEventListener("click", refreshPreview);
-  $("preview-refresh").addEventListener("click", refreshPreview);
-  $("btn-install-service").addEventListener("click", () => {
-    if (window.confirm("安装 / 更新定时任务？会保存当前配置并同步代码。")) installService();
-  });
-  $("btn-run-now").addEventListener("click", () => serviceAction("start"));
-  $("btn-service-install").addEventListener("click", () => {
-    if (window.confirm("安装 / 更新定时任务？会保存当前配置并同步代码。")) installService();
-  });
-  $("btn-service-start").addEventListener("click", () => serviceAction("start"));
-  $("btn-service-stop").addEventListener("click", () => serviceAction("stop", "停止定时任务？任务会从 launchd / 任务计划中卸载，之后可以重新启动。"));
-  $("btn-service-uninstall").addEventListener("click", () => serviceAction("uninstall", "卸载定时任务？配置与数据会保留。"));
-  $("log-refresh").addEventListener("click", () => refreshLogs(false));
-  $("dialog-close").addEventListener("click", hideDialog);
-  $("dialog").addEventListener("click", (event) => {
-    if (event.target === $("dialog")) hideDialog();
-  });
   $("shutdown-btn").addEventListener("click", async () => {
-    if (!window.confirm("关闭 GUI 服务？定时任务不会受影响。")) return;
+    if (!window.confirm("关闭 GUI？自动抢课不会受影响。")) return;
     try {
       await api("/api/shutdown", { method: "POST", body: {} });
-      toast("GUI 已停止，可以关闭页面", "ok", 6000);
-      clearInterval(logTimer);
+      showMessage("GUI 已停止，可以关闭页面", "ok", false);
     } catch (error) {
-      toast(error.message, "err");
+      showMessage(error.message, "err", false);
     }
-  });
-  window.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") hideDialog();
   });
 }
 
@@ -559,18 +367,11 @@ async function init() {
   try {
     const data = await api("/api/state");
     renderState(data);
-    await refreshLogs(true);
   } catch (error) {
-    toast(error.message, "err");
-    showDialog("无法连接 GUI", `<p>${esc(error.message)}</p><p>请回到终端确认 GUI 仍在运行。</p>`);
+    showMessage(error.message, "err", false);
     return;
   }
-  const initialTab = new URLSearchParams(window.location.search).get("tab");
-  if (initialTab) switchTab(initialTab);
-  logTimer = setInterval(() => {
-    const active = qs("#panel-service").classList.contains("active");
-    if (active && $("log-auto").checked) refreshLogs(true);
-  }, 10000);
+  await refreshSelected(true);
 }
 
 document.addEventListener("DOMContentLoaded", init);
