@@ -1,7 +1,8 @@
-# USTC 报告选课助手
+# USTC研究生综合平台学术报告选课助手
 
-基于 [1540975647/ustc_grab_report_course](https://github.com/1540975647/ustc_grab_report_course) 的
-macOS / Windows 图形化版本。保留自动抢课核心，界面只做三件事：
+USTC 研究生综合平台学术报告选课助手，基于
+[1540975647/ustc_grab_report_course](https://github.com/1540975647/ustc_grab_report_course)
+的 macOS / Windows 图形化版本。保留自动抢课核心，界面只做三件事：
 
 - **自动抢课配置**：邮箱、平台 Cookie、院系优先级、检测间隔
 - **已选报告预览**：打开页面自动读取，也可以手动刷新
@@ -164,6 +165,7 @@ venv\Scripts\python.exe scripts\macos\preflight.py --network --smtp
 
 候选排序：**院系优先级 → 报名截止升序 → 报告时间升序**。
 时间冲突窗口默认 120 分钟；每轮最多成功选 1 门。
+容量以平台服务端为准：本项目只提交 `KXRS > YXRS` 的课程，不尝试绕过人数限制。
 
 ### `_WEU` 与保活
 
@@ -291,6 +293,10 @@ powershell -ExecutionPolicy Bypass -File scripts\windows\install_task.ps1 -Inter
 
 **一直显示 0 门可抢？**
 查看“已选报告”上方的可抢数量；可能是当前没有未来报告、名额已满、院系不在白名单，或报告时间已过。
+
+**会突破人数限制吗？**
+不会。程序先过滤满员课程，平台服务端也会再次校验；直接对满员课程提交请求通常会被拒绝。
+不建议尝试绕过，可能触发风控。
 “已选报告”仍然可以正常读取，说明登录态通常没问题。
 
 **macOS 安装后没有运行？**
