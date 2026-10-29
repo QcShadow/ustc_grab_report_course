@@ -19,6 +19,15 @@ def _error(message: str) -> Dict[str, Any]:
     return {"ok": False, "error": message}
 
 
+def _friendly_error(result: Any) -> str:
+    text = str(result or "")
+    lowered = text.lower()
+    if "<html" in lowered or "<!doctype" in lowered or "登录" in text or "403" in text:
+        return "平台返回了登录/错误页面，请检查 Cookie 是否过期"
+    text = text.strip()
+    return text[:200] if text else "未知错误"
+
+
 def test_smtp(home: Path) -> Dict[str, Any]:
     try:
         config = _config(home)
@@ -56,7 +65,7 @@ def test_platform(home: Path) -> Dict[str, Any]:
         client = USTCClient(config)
         ok, result = client.search_unselected_report()
         if not ok or not isinstance(result, dict):
-            return _error(f"平台查询失败：{str(result)[:200]}")
+            return _error(f"平台查询失败：{_friendly_error(result)}")
         box = (result.get("datas") or {}).get("wxbgbgdz", {})
         rows = box.get("rows") or []
         if not isinstance(rows, list):
@@ -111,7 +120,7 @@ def preview(home: Path) -> Dict[str, Any]:
 
         ok, result = client.search_unselected_report()
         if not ok or not isinstance(result, dict):
-            return _error(f"平台查询失败：{str(result)[:200]}")
+            return _error(f"平台查询失败：{_friendly_error(result)}")
         box = (result.get("datas") or {}).get("wxbgbgdz", {})
         rows = box.get("rows") or []
         if not isinstance(rows, list):

@@ -15,109 +15,121 @@
         <p>配置一次，自动抢课</p>
       </div>
     </div>
-    <div class="topbar-right">
-      <span id="service-pill" class="pill muted">加载中</span>
-      <button id="service-toggle" class="btn primary" type="button" disabled>启用自动抢课</button>
+    <div class="service-control">
+      <span class="service-label">自动抢课</span>
+      <span id="service-pill" class="service-state">加载中</span>
+      <button id="service-toggle" class="toggle" type="button" role="switch" aria-checked="false" aria-label="自动抢课开关" disabled>
+        <span class="toggle-knob"></span>
+      </button>
     </div>
   </header>
 
   <main>
-    <p id="status-line" class="status-line">正在读取配置…</p>
-    <div id="message" class="message hidden"></div>
+    <p id="status-line" class="status-line" role="status">正在读取配置…</p>
+    <div id="message" class="message hidden" role="status" aria-live="polite"></div>
 
-    <section class="panel">
-      <div class="panel-head"><h2>自动抢课配置</h2></div>
+    <div class="layout">
+      <div class="main-column">
+        <section class="panel config-panel">
+          <div class="panel-head">
+            <h2>自动抢课配置</h2>
+          </div>
 
-      <h3>邮箱通知</h3>
-      <div class="grid-2">
-        <label>发件邮箱
-          <input id="email-sender" type="email" placeholder="you@163.com" autocomplete="off">
-        </label>
-        <label>收件邮箱
-          <input id="email-receiver" type="email" placeholder="you@163.com" autocomplete="off">
-        </label>
-        <label>SMTP 服务器
-          <input id="smtp-server" placeholder="smtp.163.com" autocomplete="off">
-        </label>
-        <label>端口
-          <input id="smtp-port" type="number" placeholder="465">
-        </label>
+          <section class="form-section">
+            <h3>邮箱通知</h3>
+            <div class="grid-2">
+              <label>发件邮箱
+                <input id="email-sender" type="email" placeholder="you@163.com" autocomplete="off">
+              </label>
+              <label>收件邮箱
+                <input id="email-receiver" type="email" placeholder="you@163.com" autocomplete="off">
+              </label>
+              <label>SMTP 服务器
+                <input id="smtp-server" placeholder="smtp.163.com" autocomplete="off">
+              </label>
+              <label>端口
+                <input id="smtp-port" type="number" placeholder="465">
+              </label>
+            </div>
+            <label>SMTP 授权码
+              <span id="hint-auth" class="secret"></span>
+              <input id="smtp-auth" type="password" autocomplete="new-password">
+            </label>
+            <p class="hint">163/QQ 邮箱填“授权码”，不是网页登录密码。</p>
+          </section>
+
+          <section class="form-section">
+            <h3>平台登录</h3>
+            <div class="grid-2">
+              <label>GS_DBLOGIN_TOKEN
+                <span id="hint-GS_DBLOGIN_TOKEN" class="secret"></span>
+                <input id="cookie-GS_DBLOGIN_TOKEN" type="password" autocomplete="new-password">
+              </label>
+              <label>GS_SESSIONID
+                <span id="hint-GS_SESSIONID" class="secret"></span>
+                <input id="cookie-GS_SESSIONID" type="password" autocomplete="new-password">
+              </label>
+              <label>_WEU
+                <span id="hint-_WEU" class="secret"></span>
+                <input id="cookie-_WEU" type="password" autocomplete="new-password">
+              </label>
+              <label>route
+                <span id="hint-route" class="secret"></span>
+                <input id="cookie-route" type="password" autocomplete="new-password">
+              </label>
+            </div>
+            <p class="hint">Chrome 登录平台 → F12 → Network → 任意 gsapp 请求 → Request Headers → Cookie。</p>
+          </section>
+
+          <section class="form-section">
+            <h3>院系优先级</h3>
+            <p class="hint">越靠前优先级越高；时间冲突时优先选靠前的院系。</p>
+            <div id="departments-list" class="dept-list"></div>
+            <div class="inline">
+              <select id="department-select" aria-label="选择要添加的院系"></select>
+              <button id="add-department" class="btn" type="button">添加院系</button>
+            </div>
+          </section>
+
+          <section class="form-section">
+            <h3>基本设置</h3>
+            <label class="switch-row">
+              <span>查询成绩（每轮多一次请求）</span>
+              <input id="enable-grade-check" type="checkbox">
+              <span class="switch" aria-hidden="true"></span>
+            </label>
+            <label>检测间隔（秒）
+              <input id="schedule-interval" type="number" min="30" step="30">
+            </label>
+          </section>
+
+          <div class="save-bar">
+            <button id="save-config" class="btn primary" type="button">保存配置</button>
+            <span class="hint">保存后，点右上角开关启用自动抢课。</span>
+          </div>
+        </section>
       </div>
-      <label>SMTP 授权码
-        <input id="smtp-auth" type="password" autocomplete="new-password">
-        <span id="hint-auth" class="secret"></span>
-      </label>
-      <p class="hint">163/QQ 邮箱填“授权码”，不是网页登录密码。</p>
 
-      <h3>平台登录</h3>
-      <div class="grid-2">
-        <label>GS_DBLOGIN_TOKEN
-          <input id="cookie-GS_DBLOGIN_TOKEN" type="password" autocomplete="new-password">
-          <span id="hint-GS_DBLOGIN_TOKEN" class="secret"></span>
-        </label>
-        <label>GS_SESSIONID
-          <input id="cookie-GS_SESSIONID" type="password" autocomplete="new-password">
-          <span id="hint-GS_SESSIONID" class="secret"></span>
-        </label>
-        <label>_WEU
-          <input id="cookie-_WEU" type="password" autocomplete="new-password">
-          <span id="hint-_WEU" class="secret"></span>
-        </label>
-        <label>route
-          <input id="cookie-route" type="password" autocomplete="new-password">
-          <span id="hint-route" class="secret"></span>
-        </label>
-      </div>
-      <p class="hint">Chrome 登录平台 → F12 → Network → 任意 gsapp 请求 → Request Headers → Cookie。</p>
-
-      <h3>院系优先级</h3>
-      <p class="hint">越靠前优先级越高；时间冲突时优先选靠前的院系。</p>
-      <div id="departments-list" class="dept-list"></div>
-      <div class="inline">
-        <select id="department-select"></select>
-        <button id="add-department" class="btn" type="button">添加院系</button>
-      </div>
-
-      <h3>基本设置</h3>
-      <label class="switch-row">
-        <span>查询成绩（每轮多一次请求）</span>
-        <input id="enable-grade-check" type="checkbox">
-        <span class="switch"></span>
-      </label>
-      <label>检测间隔（秒）
-        <input id="schedule-interval" type="number" min="30" step="30">
-      </label>
-
-      <div class="actions save-row">
-        <button id="save-config" class="btn primary" type="button">保存配置</button>
-        <span class="hint">保存后点右上角“启用自动抢课”。</span>
-      </div>
-    </section>
-
-    <section class="panel">
-      <div class="panel-head">
-        <h2>已选报告</h2>
-        <div class="inline">
-          <span id="selected-summary" class="hint"></span>
-          <button id="refresh-selected" class="btn" type="button">刷新</button>
-        </div>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr><th>院系</th><th>报告</th><th>时间</th><th>截止</th></tr>
-          </thead>
-          <tbody id="selected-body">
-            <tr><td colspan="4" class="empty">加载中…</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
+      <aside class="side-column">
+        <section class="panel selected-panel">
+          <div class="panel-head">
+            <div>
+              <h2>已选报告</h2>
+              <p id="selected-summary" class="hint selected-summary"></p>
+            </div>
+            <button id="refresh-selected" class="btn small" type="button">刷新</button>
+          </div>
+          <div id="selected-list" class="selected-list">
+            <div class="selected-empty">加载中…</div>
+          </div>
+        </section>
+      </aside>
+    </div>
   </main>
 
   <footer class="footer">
     <span id="config-path">—</span>
-    <span>·</span>
+    <span class="footer-dot">·</span>
     <button id="shutdown-btn" class="link danger" type="button">退出 GUI</button>
   </footer>
 

@@ -14,6 +14,10 @@ function esc(value) {
   }[ch]));
 }
 
+function formatDate(value) {
+  return String(value || "").slice(0, 16);
+}
+
 function showMessage(text, type = "info", autoHide = true) {
   const box = $("message");
   clearTimeout(messageTimer);
@@ -71,42 +75,37 @@ function secretHint(inputId, hintId, status) {
   }
 }
 
-function serviceEnabled() {
-  const service = state && state.service;
-  return Boolean(service && service.installed && service.loaded);
-}
-
 function renderService() {
   const service = (state && state.service) || {};
   const pill = $("service-pill");
   const toggle = $("service-toggle");
+  const enabled = Boolean(service.supported && service.installed && service.loaded);
 
   if (!service.supported) {
     pill.textContent = "手动模式";
-    pill.className = "pill muted";
-    toggle.textContent = "手动运行";
-    toggle.className = "btn";
+    pill.className = "service-state off";
+    toggle.classList.remove("on");
+    toggle.setAttribute("aria-checked", "false");
     toggle.disabled = true;
+    toggle.title = "当前平台请手动运行";
     return;
   }
 
-  if (service.installed && service.loaded) {
+  if (enabled) {
     pill.textContent = "已启用";
-    pill.className = "pill ok";
-    toggle.textContent = "停止";
-    toggle.className = "btn danger";
+    pill.className = "service-state on";
   } else if (service.installed) {
     pill.textContent = "已停止";
-    pill.className = "pill bad";
-    toggle.textContent = "启用自动抢课";
-    toggle.className = "btn primary";
+    pill.className = "service-state off";
   } else {
     pill.textContent = "未安装";
-    pill.className = "pill muted";
-    toggle.textContent = "启用自动抢课";
-    toggle.className = "btn primary";
+    pill.className = "service-state off";
   }
+
+  toggle.classList.toggle("on", enabled);
+  toggle.setAttribute("aria-checked", enabled ? "true" : "false");
   toggle.disabled = false;
+  toggle.title = enabled ? "点击停止自动抢课" : "点击启用自动抢课";
 }
 
 function updateStatusLine() {
@@ -168,9 +167,9 @@ function renderDepartments() {
       <span class="dept-index">${index + 1}</span>
       <span class="dept-name">${esc(dept.name)} <code>${esc(dept.code)}</code></span>
       <span class="dept-actions">
-        <button type="button" data-act="up" title="上移" ${index === 0 ? "disabled" : ""}>↑</button>
-        <button type="button" data-act="down" title="下移" ${index === departments.length - 1 ? "disabled" : ""}>↓</button>
-        <button type="button" data-act="remove" class="remove" title="移除">×</button>
+        <button type="button" data-act="up" title="上移" aria-label="上移 ${esc(dept.name)}" ${index === 0 ? "disabled" : ""}>↑</button>
+        <button type="button" data-act="down" title="下移" aria-label="下移 ${esc(dept.name)}" ${index === departments.length - 1 ? "disabled" : ""}>↓</button>
+        <button type="button" data-act="remove" class="remove" title="移除" aria-label="移除 ${esc(dept.name)}">×</button>
       </span>`;
     row.querySelector('[data-act="up"]').onclick = () => moveDepartment(index, -1);
     row.querySelector('[data-act="down"]').onclick = () => moveDepartment(index, 1);
@@ -274,16 +273,19 @@ function renderSelected(data) {
   const selected = data.selected || [];
   $("selected-summary").textContent = `已选 ${selected.length} 门 · 可抢 ${data.eligible_count || 0} 门`;
 
-  const body = $("selected-body");
+  const list = $("selected-list");
   if (!selected.length) {
-    body.innerHTML = `<tr><td colspan="4" class="empty">暂无已选报告</td></tr>`;
+    list.innerHTML = `<div class="selected-empty">暂无已选报告</div>`;
   } else {
-    body.innerHTML = selected.map((row) => `<tr>
-      <td>${esc(row.YXDM_DISPLAY)}</td>
-      <td>${esc(row.BGTMZW)}</td>
-      <td>${esc(row.BGSJ)}</td>
-      <td>${esc(row.JZSJ)}</td>
-    </tr>`).join("");
+    list.innerHTML = selected.map((row) => `
+      <article class="selected-item">
+        <div class="selected-title">${esc(row.BGTMZW)}</div>
+        <div class="selected-meta">
+          <span class="selected-dept">${esc(row.YXDM_DISPLAY)}</span>
+          <span>${esc(formatDate(row.BGSJ))}</span>
+          <span>截止 ${esc(formatDate(row.JZSJ))}</span>
+        </div>
+      </article>`).join("");
   }
   if (data.selected_error) {
     showMessage(`已选报告读取失败：${data.selected_error}`, "err", false);
@@ -299,7 +301,9 @@ async function refreshSelected(silent = false) {
     renderSelected(data);
     if (!silent) showMessage("已刷新", "ok");
   } catch (error) {
-    if (!silent) showMessage(error.message, "err", false);
+    $("selected-summary").textContent = "读取失败";
+    $("selected-list").innerHTML = `<div class="selected-empty error">读取失败，请检查平台 Cookie</div>`;
+    showMessage(error.message, "err", false);
   } finally {
     setBusy(button, false);
   }
@@ -312,7 +316,7 @@ async function toggleService() {
 
   if (service.installed && service.loaded) {
     if (!window.confirm("停止自动抢课？配置和数据会保留。")) return;
-    setBusy(button, true, "停止中…");
+    button.disabled = true;
     try {
       const result = await api("/api/service/stop", { method: "POST", body: {} });
       if (result.service) state.service = result.service;
@@ -321,15 +325,15 @@ async function toggleService() {
       showMessage("自动抢课已停止", "ok");
     } catch (error) {
       showMessage(error.message, "err", false);
-    } finally {
-      setBusy(button, false);
+      renderService();
     }
     return;
   }
 
-  setBusy(button, true, "启用中…");
+  button.disabled = true;
   try {
     await saveConfig(false);
+    button.disabled = true;
     const interval = Number($("schedule-interval").value) || 120;
     const result = await api("/api/service/install", {
       method: "POST",
@@ -341,8 +345,7 @@ async function toggleService() {
     showMessage("自动抢课已启用", "ok");
   } catch (error) {
     showMessage(error.message, "err", false);
-  } finally {
-    setBusy(button, false);
+    renderService();
   }
 }
 
