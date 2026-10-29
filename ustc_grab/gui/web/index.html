@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>USTC 报告选课助手</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">USTC</div>
+      <div class="brand-text">
+        <h1>报告选课助手</h1>
+        <p>研究生学术报告监控 · 自动选课 · macOS / Windows</p>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <span id="platform-badge" class="pill">—</span>
+      <span id="service-pill" class="pill muted">加载中</span>
+      <button id="refresh-btn" class="btn ghost" type="button">刷新</button>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs">
+    <button class="tab active" data-tab="overview" type="button">概览</button>
+    <button class="tab" data-tab="config" type="button">配置</button>
+    <button class="tab" data-tab="preview" type="button">报告预览</button>
+    <button class="tab" data-tab="service" type="button">服务与日志</button>
+  </nav>
+
+  <main>
+    <section class="tab-panel active" id="panel-overview">
+      <div class="cards">
+        <div class="card">
+          <span class="card-label">服务状态</span>
+          <strong id="card-service">—</strong>
+          <small id="card-service-detail">—</small>
+        </div>
+        <div class="card">
+          <span class="card-label">上次退出码</span>
+          <strong id="card-exit">—</strong>
+          <small id="card-runs">—</small>
+        </div>
+        <div class="card">
+          <span class="card-label">已选报告</span>
+          <strong id="card-selected">—</strong>
+          <small>点击“报告预览”获取</small>
+        </div>
+        <div class="card">
+          <span class="card-label">当前可抢</span>
+          <strong id="card-eligible">—</strong>
+          <small>按院系优先级排序</small>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h2>快捷操作</h2>
+        </div>
+        <div class="actions">
+          <button id="btn-test-platform" class="btn" type="button">测试平台连接</button>
+          <button id="btn-test-smtp" class="btn" type="button">测试 SMTP</button>
+          <button id="btn-test-email" class="btn" type="button">发送测试邮件</button>
+          <button id="btn-preview" class="btn" type="button">刷新报告预览</button>
+          <button id="btn-install-service" class="btn primary" type="button">安装 / 更新定时任务</button>
+          <button id="btn-run-now" class="btn" type="button">立即运行一次</button>
+        </div>
+        <p class="hint">测试和预览使用已保存的配置；修改后请先点“保存配置”。</p>
+        <p class="hint" id="overview-hint">正在读取配置…</p>
+      </div>
+
+      <div class="panel">
+        <h2>这是怎么工作的</h2>
+        <div class="steps">
+          <div class="step"><b>1</b><span>填写邮箱与平台 Cookie，保存配置。</span></div>
+          <div class="step"><b>2</b><span>用“报告预览”确认筛选条件和院系优先级。</span></div>
+          <div class="step"><b>3</b><span>安装定时任务，服务会按间隔自动检测并抢课。</span></div>
+          <div class="step"><b>4</b><span>抢到课程或 cookie 过期时会发邮件通知。</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="tab-panel" id="panel-config">
+      <div class="grid-2">
+        <div class="panel">
+          <h2>邮件通知</h2>
+          <label>发件邮箱
+            <input id="email-sender" type="email" placeholder="you@163.com" autocomplete="off">
+          </label>
+          <label>收件邮箱
+            <input id="email-receiver" type="email" placeholder="you@163.com" autocomplete="off">
+          </label>
+          <div class="grid-2">
+            <label>SMTP 服务器
+              <input id="smtp-server" placeholder="smtp.163.com" autocomplete="off">
+            </label>
+            <label>端口
+              <input id="smtp-port" type="number" placeholder="465">
+            </label>
+          </div>
+          <label>SMTP 授权码
+            <input id="smtp-auth" type="password" autocomplete="new-password">
+            <span id="hint-auth" class="secret"></span>
+          </label>
+          <p class="hint">163/QQ 邮箱填“授权码/客户端授权密码”，不是网页登录密码。</p>
+        </div>
+
+        <div class="panel">
+          <h2>平台登录凭据</h2>
+          <label>GS_DBLOGIN_TOKEN
+            <input id="cookie-GS_DBLOGIN_TOKEN" type="password" autocomplete="new-password">
+            <span id="hint-GS_DBLOGIN_TOKEN" class="secret"></span>
+          </label>
+          <label>GS_SESSIONID
+            <input id="cookie-GS_SESSIONID" type="password" autocomplete="new-password">
+            <span id="hint-GS_SESSIONID" class="secret"></span>
+          </label>
+          <label>_WEU
+            <input id="cookie-_WEU" type="password" autocomplete="new-password">
+            <span id="hint-_WEU" class="secret"></span>
+          </label>
+          <label>route
+            <input id="cookie-route" type="password" autocomplete="new-password">
+            <span id="hint-route" class="secret"></span>
+          </label>
+          <div class="grid-2">
+            <label>EMAP_LANG（可选）
+              <input id="cookie-EMAP_LANG" placeholder="zh">
+            </label>
+            <label>THEME（可选）
+              <input id="cookie-THEME" placeholder="blue">
+            </label>
+          </div>
+          <details class="details">
+            <summary>怎么获取 Cookie？</summary>
+            <ol class="hint-list">
+              <li>Chrome 登录 <code>https://yjs1.ustc.edu.cn</code></li>
+              <li>F12 → Network → 点任意 gsapp 请求 → Headers</li>
+              <li>复制 Request Headers 里 <code>Cookie:</code> 后面的整段</li>
+              <li>按分号拆成上面的四个字段</li>
+            </ol>
+            <p class="hint">客户端会按应用自动刷新并缓存 _WEU，填任意页面的值即可。</p>
+          </details>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h2>院系优先级</h2>
+          <span class="hint">越靠前优先级越高；时间冲突时优先选靠前的院系</span>
+        </div>
+        <div id="departments-list" class="dept-list"></div>
+        <div class="inline">
+          <select id="department-select"></select>
+          <button id="add-department" class="btn" type="button">添加院系</button>
+        </div>
+        <details class="details">
+          <summary>手动添加院系代码</summary>
+          <div class="inline">
+            <input id="custom-code" placeholder="代码，如 229">
+            <input id="custom-name" placeholder="院系名称">
+            <button id="add-custom" class="btn" type="button">添加</button>
+          </div>
+        </details>
+      </div>
+
+      <div class="grid-2">
+        <div class="panel">
+          <h2>筛选与频率</h2>
+          <label class="switch-row">
+            <span>开启成绩查询（每轮多一次请求）</span>
+            <input id="enable-grade-check" type="checkbox">
+            <span class="switch"></span>
+          </label>
+          <div class="grid-2">
+            <label>每轮最多成功选课
+              <input id="max-grabs" type="number" min="1" max="20">
+            </label>
+            <label>时间冲突窗口（分钟）
+              <input id="conflict-window" type="number" min="0" max="1440">
+            </label>
+            <label>检测间隔（秒）
+              <input id="schedule-interval" type="number" min="30" max="86400">
+            </label>
+            <label>每页候选数
+              <input id="page-size" type="number" min="1" max="999">
+            </label>
+          </div>
+          <label class="switch-row">
+            <span>启用保活任务（会退课再抢回，存在丢课风险）</span>
+            <input id="enable-keepalive" type="checkbox">
+            <span class="switch"></span>
+          </label>
+          <label>保活课程 BGBM
+            <input id="particular-bgbm" placeholder="可选；启用保活时必填">
+          </label>
+        </div>
+
+        <div class="panel">
+          <h2>排除课程</h2>
+          <p class="hint">每行一个 BGBM。命中的课程不会被选；如果已经选了，会自动退课。</p>
+          <textarea id="exclude-list" rows="10" spellcheck="false" placeholder="每行一个 BGBM"></textarea>
+        </div>
+      </div>
+
+      <div class="panel actions sticky-actions">
+        <button id="save-config" class="btn primary" type="button">保存配置</button>
+        <button id="save-install" class="btn" type="button">保存并安装服务</button>
+        <span id="save-hint" class="hint"></span>
+      </div>
+    </section>
+
+    <section class="tab-panel" id="panel-preview">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>当前可抢报告</h2>
+          <button id="preview-refresh" class="btn" type="button">刷新</button>
+        </div>
+        <div id="preview-summary" class="hint">点击“刷新”查询平台。</div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>优先</th><th>院系</th><th>报告</th><th>报告时间</th><th>报名截止</th><th>余量</th><th>状态</th>
+              </tr>
+            </thead>
+            <tbody id="eligible-body">
+              <tr><td colspan="7" class="empty">暂无数据</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h2>已选报告</h2>
+          <span id="selected-summary" class="hint"></span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>院系</th><th>报告</th><th>报告时间</th><th>报名截止</th><th>地点</th></tr>
+            </thead>
+            <tbody id="selected-body">
+              <tr><td colspan="5" class="empty">暂无数据</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="tab-panel" id="panel-service">
+      <div class="panel">
+        <h2>定时任务</h2>
+        <dl id="service-detail" class="kv">
+          <dt>状态</dt><dd>—</dd>
+        </dl>
+        <div class="actions">
+          <button id="btn-service-install" class="btn primary" type="button">安装 / 更新</button>
+          <button id="btn-service-start" class="btn" type="button">立即运行</button>
+          <button id="btn-service-stop" class="btn" type="button">停止</button>
+          <button id="btn-service-uninstall" class="btn danger" type="button">卸载</button>
+        </div>
+        <p class="hint">macOS 使用 launchd（Application Support）；Windows 使用任务计划程序。</p>
+        <pre id="service-output" class="output hidden"></pre>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h2>运行日志</h2>
+          <div class="inline">
+            <label class="check"><input id="log-auto" type="checkbox" checked> 自动刷新</label>
+            <button id="log-refresh" class="btn" type="button">刷新</button>
+          </div>
+        </div>
+        <pre id="log-output" class="log">加载中…</pre>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span id="config-path">—</span>
+    <span>·</span>
+    <span>所有配置与日志仅保存在本机</span>
+    <button id="shutdown-btn" class="link danger" type="button">退出 GUI</button>
+  </footer>
+
+  <div id="toast" class="toast"></div>
+
+  <div id="dialog" class="dialog-backdrop hidden">
+    <div class="dialog">
+      <div class="dialog-head">
+        <h3 id="dialog-title">提示</h3>
+        <button id="dialog-close" class="btn ghost" type="button">关闭</button>
+      </div>
+      <div id="dialog-body" class="dialog-body"></div>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

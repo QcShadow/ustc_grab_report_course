@@ -19,7 +19,7 @@ class Mailer:
         self.auth_code = smtp_conf.get("auth_code")
         self.smtp_port = int(smtp_conf.get("port", 465))
 
-    def _send(self, subject: str, html_content: str):
+    def _send(self, subject: str, html_content: str) -> bool:
         msg = MIMEMultipart()
         msg['From'] = self.sender
         msg['To'] = self.receiver
@@ -33,12 +33,23 @@ class Mailer:
                 print('login success...')
                 server.send_message(msg)
             print(f"[{datetime.now().strftime('%H:%M:%S')}] Email sent successfully -> {self.receiver}")
+            return True
         except smtplib.SMTPAuthenticationError as e:
             print(f"[{datetime.now().strftime('%H:%M:%S')}] Auth failed [{e.smtp_code}]: {e.smtp_error.decode()}")
         except smtplib.SMTPConnectError:
             print(f"[{datetime.now().strftime('%H:%M:%S')}] Connection failed: {self.smtp_server}:{self.smtp_port}")
         except Exception as e:
             print(f"[{datetime.now().strftime('%H:%M:%S')}] Error sending email: {type(e).__name__}: {e}")
+        return False
+
+    def send_test(self) -> bool:
+        """Sends a configuration test email."""
+        html = f"""
+        <h2>USTC 报告助手测试邮件</h2>
+        <p>如果你收到这封邮件，说明 SMTP 配置正常。</p>
+        <p><em>时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</em></p>
+        """
+        return self._send("USTC 报告助手测试邮件", html)
 
     def send_success(self, report_item: Dict[str, Any]):
         """Sends an email when a course is successfully grabbed."""

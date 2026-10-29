@@ -17,21 +17,10 @@ SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 DEST="${USTC_GRAB_HOME:-$HOME/Library/Application Support/USTC-Grab/report-course}"
 AGENTS="$HOME/Library/LaunchAgents"
 PYTHON_BIN="${PYTHON_BIN:-/usr/bin/python3}"
-START_INTERVAL="${START_INTERVAL:-120}"
-ENABLE_KEEPALIVE="${ENABLE_KEEPALIVE:-0}"
+START_INTERVAL="${START_INTERVAL:-}"
+ENABLE_KEEPALIVE="${ENABLE_KEEPALIVE:-}"
 
 say() { printf '%s\n' "$*"; }
-
-case "$START_INTERVAL" in
-  ''|*[!0-9]*)
-    say "START_INTERVAL 必须是整数秒，例如 START_INTERVAL=120"
-    exit 2
-    ;;
-esac
-if [ "$START_INTERVAL" -lt 30 ]; then
-  say "START_INTERVAL 不能小于 30 秒"
-  exit 2
-fi
 
 if [ "$(uname -s)" != "Darwin" ]; then
   say "此脚本只适用于 macOS。Linux 请使用 scripts/ustc-grab.service 或 cron。"
@@ -44,17 +33,24 @@ say "运行目录: $DEST"
 mkdir -p "$DEST" "$DEST/logs" "$AGENTS"
 
 # 1. 同步代码。config.yml / data / logs / venv 是运行时状态，不覆盖。
-say "同步代码..."
-rsync -a \
-  --exclude 'venv' \
-  --exclude '.git' \
-  --exclude 'logs' \
-  --exclude 'config.yml' \
-  --exclude 'data' \
-  --exclude '__pycache__' \
-  --exclude '*.pyc' \
-  --exclude '.DS_Store' \
-  "$SRC/" "$DEST/"
+SRC_REAL="$(cd "$SRC" && pwd -P)"
+DEST_REAL="$(cd "$DEST" && pwd -P)"
+if [ "$SRC_REAL" != "$DEST_REAL" ]; then
+  say "同步代码..."
+  rsync -a \
+    --exclude 'venv' \
+    --exclude '.git' \
+    --exclude 'logs' \
+    --exclude 'config.yml' \
+    --exclude 'config.yml.bak' \
+    --exclude 'data' \
+    --exclude '__pycache__' \
+    --exclude '*.pyc' \
+    --exclude '.DS_Store' \
+    "$SRC/" "$DEST/"
+else
+  say "已在运行目录，跳过代码同步"
+fi
 
 # 首次部署时带上 data 的初始状态（成绩缓存、排除列表等）
 if [ ! -d "$DEST/data" ]; then
@@ -73,10 +69,33 @@ say "安装/校验依赖..."
 
 # 3. 配置文件
 if [ ! -f "$DEST/config.yml" ]; then
-  cp "$DEST/templates/config.template.yml" "$DEST/config.yml"
+  if [ -f "$SRC/config.yml" ]; then
+    cp "$SRC/config.yml" "$DEST/config.yml"
+  else
+    cp "$DEST/templates/config.template.yml" "$DEST/config.yml"
+  fi
   say "已生成配置文件: $DEST/config.yml"
 fi
 chmod 600 "$DEST/config.yml"
+
+# 从配置读取 GUI 设置的默认值（环境变量优先）
+if [ -z "$START_INTERVAL" ]; then
+  START_INTERVAL=$("$DEST/venv/bin/python" -c "import sys,yaml; d=yaml.safe_load(open(sys.argv[1],encoding='utf-8')) or {}; v=d.get('schedule_interval_seconds',120); print(max(30,min(int(v),86400)) if str(v).isdigit() else 120)" "$DEST/config.yml")
+fi
+if [ -z "$ENABLE_KEEPALIVE" ]; then
+  ENABLE_KEEPALIVE=$("$DEST/venv/bin/python" -c "import sys,yaml; d=yaml.safe_load(open(sys.argv[1],encoding='utf-8')) or {}; print('1' if d.get('enable_keepalive') else '0')" "$DEST/config.yml")
+fi
+
+case "$START_INTERVAL" in
+  ''|*[!0-9]*)
+    say "START_INTERVAL 必须是整数秒，例如 START_INTERVAL=120"
+    exit 2
+    ;;
+esac
+if [ "$START_INTERVAL" -lt 30 ]; then
+  say "START_INTERVAL 不能小于 30 秒"
+  exit 2
+fi
 
 # 4. 配置自检；未填好就不注册定时任务
 if ! "$DEST/venv/bin/python" "$DEST/scripts/macos/preflight.py"; then

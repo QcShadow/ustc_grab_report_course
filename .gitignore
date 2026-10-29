@@ -13,6 +13,8 @@ dist/
 
 # Configuration
 config.yml
+config.yml.bak
+config.yml.tmp
 .env
 
 # Logs

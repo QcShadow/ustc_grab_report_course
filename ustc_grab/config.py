@@ -112,6 +112,27 @@ class Config:
         return max(0, value)
 
     @property
+    def schedule_interval_seconds(self) -> int:
+        """How often the scheduler runs a detection cycle. Default 120 seconds."""
+        try:
+            value = int(self._data.get("schedule_interval_seconds", 120))
+        except (TypeError, ValueError):
+            return 120
+        return max(30, min(value, 86400))
+
+    @property
+    def enable_keepalive(self) -> bool:
+        return bool(self._data.get("enable_keepalive", False))
+
+    @property
+    def page_size(self) -> int:
+        try:
+            value = int(self.data_raw.get("pageSize", 999))
+        except (TypeError, ValueError):
+            return 999
+        return max(1, min(value, 999))
+
+    @property
     def enable_grade_check(self) -> bool:
         """Returns whether grade checking is enabled. Default False."""
         return self._data.get("enable_grade_check", False)

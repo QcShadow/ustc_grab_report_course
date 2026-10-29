@@ -1,246 +1,270 @@
-# USTC研究生综合服务平台学术报告自动选课
+# USTC 研究生学术报告监控与自动选课
 
-> **本仓库说明**：这是基于 [1540975647/ustc_grab_report_course](https://github.com/1540975647/ustc_grab_report_course) 的改造版，新增了 macOS launchd 部署、按应用缓存 `_WEU`、院系优先级与时间冲突处理、每轮限选和邮件去重。macOS 部署见 [DEPLOY_MACOS.md](DEPLOY_MACOS.md)。
+> 基于 [1540975647/ustc_grab_report_course](https://github.com/1540975647/ustc_grab_report_course) 的跨平台改造版。
+> 新增图形界面、macOS launchd / Windows 任务计划、按应用缓存 `_WEU`、院系优先级与时间冲突处理、
+> 每轮限选和邮件去重。
 >
-> **不要提交 `config.yml`**：里面有平台 cookie 和邮箱 SMTP 授权码，仓库已用 `.gitignore` 忽略。
+> **郑重声明**：本项目仅用于个人学习自动化与系统实践，通过低频请求监控学术报告并发送通知。
+> 请勿修改为高频访问或用于突破平台限制；因使用不当导致账号被限制的，后果自负。
 
-#### 郑重声明：本项目旨在通过自动化方式监控研究生学术报告课程的实时变化，并在出现可选择报告时发送通知，提高信息获取效率；本工具严格限制请求频率，仅用于学习自动化脚本与系统工程的实践；不会进行高频访问或突破系统限制，也不会影响服务器正常运行；若擅自修改执行间隔，导致被服务器封禁，后果自负！
+## 功能
 
-### 1. 制作该脚本的缘由
+- **图形界面**：浏览器中填写邮箱、Cookie、院系优先级和筛选条件，一键测试与安装服务。
+- **跨平台**：macOS 使用 launchd，Windows 使用任务计划程序；核心逻辑纯 Python，无平台绑定。
+- **按应用缓存 `_WEU`**：平台的 `_WEU` 按应用隔离，客户端自动获取、缓存并在失效时重试。
+- **院系优先级**：按你指定的院系顺序排序；时间冲突时优先靠前的院系。
+- **安全限流**：每轮最多成功选 1 门、最多尝试 3 门；检测间隔可配置（默认 120 秒）。
+- **邮件通知**：选课成功、退课成功、成绩更新、Cookie 过期；过期提醒只发一次。
+- **排除课程**：`data/exclude.json` 中的课程不会被选；若已选会自动退课。
+- **日志与诊断**：GUI 内查看运行日志、测试 SMTP 和平台连接、预览当前可抢报告。
 
-由于USTC某`225学院`从`2025级`开始要求必须选够至少`8`个学术报告，才能进行毕业论文的开题，但是仅允许选择某些学院开设的报告，而且由于该学院人数众多，符合要求的报告如果有了新的不会自动提醒选课，导致知道消息之后该报告早就被抢光了，故做此脚本。
+## 界面预览
 
-### 2. 该脚本实现的功能
+![配置界面](docs/gui-config.png)
 
-本项目已重构为模块化的 Python 包 `ustc_grab`，提供更优雅的代码结构和更好的维护性。
+*界面示意，使用虚构的演示配置。*
 
-#### 2.1 主程序与选课逻辑
-```
-main.py
-```
-负责调用 `ustc_grab` 包执行选课循环：
-- 自动退掉在 `data/exclude.json` 中配置的课程。
-- 搜索并筛选符合条件的报告。
-- 自动抢课并发送邮件通知。
+## 快速开始
 
-#### 2.2 自动保活
-```
-main_update_weu.py
-```
-负责定时更新 `_WEU` cookie 字段，防止会话过期。经过测试，`cookie`中的其他字段仅需手动登录平台抓包获取1次，但`_WEU`字段若不更新，会在若干小时后过期，故需要定时更新（下方会设置`30分钟`更新一次）。~~至于其他字段什么时候过期我也还不清楚，反正现在跑了2-3个月了还没过期，如果过期了就重新登录平台抓一下吧orz。~~
+要求：Python **3.9+**，能访问 `https://yjs1.ustc.edu.cn`。
 
-#### 2.3 功能模块 (在 `ustc_grab/` 包中)
-- **核心逻辑** (`ustc_grab/manager.py`): 统筹搜索、选课、退课、查成绩等流程。
-- **网络请求** (`ustc_grab/client.py`): 封装 `HTTP` 请求，自动处理复杂的查询参数和 `Headers`。
-- **配置管理** (`ustc_grab/config.py`): 统一管理配置，支持 `.env` 和 `config.yml`。
-- **邮件通知** (`ustc_grab/notification.py`): 发送选课成功、失败及 Cookie 过期通知。
-
-#### 2.4 成绩监控 (可选功能)
-
-本系统还实现了成绩查询功能，~~（你以为脚本名字叫查报告我就只查报告吗？）~~，会自动轮询 `/wdcjapp` 接口查询成绩，如有新出的成绩（通过唯一 `ID` 和本地缓存对比），自动发送详细的邮件通知（包含课程名、分数、绩点）。
-**默认关闭**，需在配置文件中开启。
-~~有心脏病或者高血压的记得千万别开，不然到时候一个邮件发过来发现挂科了有点猝不及防。~~
-
-### 3. 使用方式
-
-#### 运行逻辑：
-- 每1分钟执行`main.py`
-  - **(若开启)** 查询是否有新成绩发布并与`data/grades.json`比对，如果有，发送`成绩通知`提醒邮件
-  - 读取`data/exclude.json`，查看是否有已经排除但仍然已选的报告，如果存在，尝试退课，若退课成功，发送`退课成功`提醒邮件
-  - 然后查询特定院系的报告，看是否有上新，如果有上新，则尝试选课，选课成功，发送`选课成功`提醒邮件
-  - 若符合条件的报告是`data/exclude.json`中已经排除的报告，不会选择该课程
-  - 若`cookie`过期，则发送`cookie过期`提醒邮件
-  - 如果没有报告上新，程序结束
-- 每30分钟执行`main_update_weu.py`
-  - 更新`cookie`中的`_WEU`字段用于保活
-
-> **`Python`版本推荐`>=3.9`**
-
-#### 3.1 下载到本地与安装依赖
+### macOS
 
 ```bash
-git clone https://github.com/1540975647/ustc_grab_report_course.git
-cd ustc_grab_report_course/
-```
-
-安装所需依赖：
-```bash
-# 创建虚拟环境
+git clone https://github.com/QcShadow/ustc_grab_report_course.git
+cd ustc_grab_report_course
 python3 -m venv venv
-
-# 激活虚拟环境
 source venv/bin/activate
-
-# 安装依赖
-pip3 install -r requirements.txt
+pip install -r requirements.txt
+python gui.py
 ```
 
-#### 3.2 配置 `config.yml`
+GUI 会在浏览器打开。配置与数据保存在：
 
-在`config.yml`中配置`email` ，`cookies`，`particular_course`和查询信息。模板文件位于 `templates/` 目录。
-
-```bash
-cp templates/config.template.yml config.yml
-vim config.yml
+```text
+~/Library/Application Support/USTC-Grab/report-course
 ```
 
-```yaml
-# 是否开启成绩自动查询 (默认 false，可修改为 true)
-enable_grade_check: false
-```
+macOS 的后台任务（launchd）不能读取桌面目录，所以运行时使用 Application Support，而不是仓库目录。
 
-```yaml
-email:
-  # 邮件发送人 
-  sender: xx@xx.com                                           # 必须修改
-  # 邮件接收人          
-  receiver: xx@xx.com                                         # 必须修改
-  # 需自行开启SMTP          
-  smtp:          
-    # SMTP邮件服务器，根据使用的SMTP服务器修改          
-    server: smtp.qq.com             
-    # SMTP邮件服务器端口号，根据使用的SMTP服务器修改          
-    port: 465          
-    # SMTP邮件服务器密钥          
-    auth_code: xxxxxxxxxxxxxxxxxxxxx                          # 必须修改
-```
-```yaml
-data-raw:          
-  # 分页查询条件信息
-  # 不建议修改，如若需要选特定学院的报告，请进入config.template.yml中查看          
-  querySetting:                                               # 非必须
-```
+### Windows
 
-```yaml                                              
-# 需要自行登录平台抓包获取（Chrome可按F12，打开网络，选择一个文件查看其请求头）
-cookies:
-  GS_DBLOGIN_TOKEN: xxxxxxxxxxxxxxxxxxxxx                     # 必须修改
-  GS_SESSIONID: xxxxxxxxxxxxxxxxxxxxx                         # 必须修改
-  EMAP_LANG: zh                                               # 非必须
-  THEME: blue                                                 # 非必须
-  _WEU: xxxxxxxxxxxxxxxxxxxxx                                 # 必须定时修改(可使用main_update_weu.py)
-  route: xxxxxxxxxxxxxxxxxxxxx                                # 必须修改
-```
+1. 安装 Python 3.9+，安装时勾选 **Add Python to PATH**。
+2. 克隆或解压本项目。
+3. 双击 **`setup_windows.bat`**。
 
-```yaml
-particular_course:
-  # 用于保活cookie中_WEU字段的特殊课程编号
-  BGBM: xxxxxxxxxxxxxxxxxxxxx                                 # 建议设为一个真实的可选人数多且过期距今较久的课程
-```
+脚本会自动创建 `venv`、安装依赖并启动 GUI。之后可以双击 `start_gui.bat` 再次打开。
 
-#### 3.3 排除不想选的课
+Windows 的配置与数据就在项目目录下（`config.yml`、`data/`、`logs/`）。
 
-对于某些符合搜索条件的课程，如果不想选择该课程，可以通过手动配置`data/exclude.json`，填入需要排除的课程号`BGBM`。
+## 第一次使用
 
-> **注意：** 最后一个课程号后不要加`,`
+1. **邮件通知**：填写发件邮箱、收件邮箱、SMTP 服务器、端口和授权码。
+   - 163：`smtp.163.com:465`，授权码在网页版“设置 → POP3/SMTP/IMAP”开启。
+   - QQ：`smtp.qq.com:465`，授权码在“设置 → 账户”开启 SMTP 后获取。
+   - 授权码不是邮箱登录密码。
+2. **平台 Cookie**：Chrome 登录 `https://yjs1.ustc.edu.cn`，F12 → Network → 任意 `gsapp` 请求 →
+   Request Headers → 复制 `Cookie:` 后面的整段，按分号拆成四个字段填入。
+   - `GS_DBLOGIN_TOKEN`
+   - `GS_SESSIONID`
+   - `_WEU`
+   - `route`
+   - `_WEU` 不需要手动续期，客户端会按应用自动刷新并缓存。
+3. **院系优先级**：添加院系，用 ↑ ↓ 调整顺序。越靠前优先级越高。
+4. **筛选条件**：设置检测间隔、每轮最多选几门、时间冲突窗口、是否查成绩。
+5. **保存配置**，然后点“测试 SMTP”“测试平台连接”确认可用。
+6. 点“报告预览”查看当前可抢报告和已选报告。
+7. 点“安装 / 更新定时任务”，服务开始自动运行。
 
-```bash
-vim data/exclude.json
-```
+## 配置说明
+
+| 配置项 | 说明 | 默认 |
+| --- | --- | --- |
+| `email.sender` / `email.receiver` | 发件、收件邮箱 | 必填 |
+| `email.smtp.server` / `port` | SMTP 服务器与端口（SSL） | `smtp.qq.com:465` |
+| `email.smtp.auth_code` | SMTP 授权码 / 客户端授权密码 | 必填 |
+| `cookies.GS_DBLOGIN_TOKEN` | 平台登录 Cookie | 必填 |
+| `cookies.GS_SESSIONID` | 平台会话 Cookie | 必填 |
+| `cookies._WEU` | 应用令牌，自动刷新 | 必填 |
+| `cookies.route` | 平台路由 Cookie | 必填 |
+| `data_raw.querySetting` 的 `YXDM` | 院系白名单，逗号分隔，顺序即优先级 | 9 个院系 |
+| `enable_grade_check` | 是否查询成绩 | `false` |
+| `max_grabs_per_cycle` | 每轮最多成功选几门 | `1` |
+| `conflict_window_minutes` | 开始时间相差小于该值视为冲突 | `120` |
+| `schedule_interval_seconds` | 定时检测间隔（秒） | `120` |
+| `enable_keepalive` | 是否安装保活任务 | `false` |
+| `particular_course.BGBM` | 保活课程编号（启用保活时必填） | 空 |
+| `data_raw.pageSize` | 一次取回多少候选 | `999` |
+| `interval` | 保活任务退课后等待秒数 | `30` |
+
+`data/exclude.json` 用于排除不想选的课程：
 
 ```json
 {
   "EXCLUDE_BGBM": [
-    "04cba049ba9a4fcba73e4800ba1607d3", 
-    "de253fc99d1a40d6af0fb3b8826e0ec0", 
-    "55914b1de2c844e787b257c9f04a4bbc"  
+    "04cba049ba9a4fcba73e4800ba1607d3"
   ]
 }
 ```
 
-#### 3.4 配置定时任务
+GUI 的“排除课程”文本框每行填一个 `BGBM`。
 
-建议使用定时任务以确保及时获取报告信息。
+## 筛选逻辑
 
-**注：下方定时任务`3.4.1`和`3.4.2`配置2选1即可**
+服务端先按 `YXDM` 白名单查询；客户端再过滤：
 
-> **安全提示**: 建议不要使用 `root` 用户运行此服务。
+1. 院系必须在白名单中（双保险）
+2. `BGSJ`（报告时间）晚于当前
+3. `JZSJ`（报名截止）晚于当前
+4. `KXRS`（可选人数）大于 `YXRS`（已选人数）
+5. `BGBM` 不在 `data/exclude.json` 中
 
-#### 3.4.1 使用`cron`配置定时任务
+候选排序：**院系优先级 → 报名截止升序 → 报告时间升序**。
 
-```bash
-crontab -e                                                  # 编辑定时任务
-```
+时间冲突：两场报告开始时间相差小于 `conflict_window_minutes`（默认 120 分钟）视为冲突。
+每轮最多成功选 1 门，因此优先提交优先级最高的候选；把 `max_grabs_per_cycle` 调大后，
+脚本会跳过与本轮已选报告冲突的低优先级候选。
 
-```
-*/1  * * * * /path/to/ustc_grab_report_course/venv/bin/python3 /path/to/ustc_grab_report_course/main.py            # 每1分钟执行报告搜索脚本
-*/30 * * * * /path/to/ustc_grab_report_course/venv/bin/python3 /path/to/ustc_grab_report_course/main_update_weu.py # 每30分钟更新一次cookie中的_WEU字段
-```
+已经选上的课程不会被自动替换；如果新报告与已选课程冲突，平台会拒绝，脚本会继续尝试其他候选。
 
-```bash
-crontab -l                                                  # 查看定时任务
-```
-#### 3.4.2 使用`ustc_grab_runner.sh`配置定时任务
+## 定时任务
 
-`scripts/ustc_grab_runner.sh`是一个可自动执行`3.4.1`中两个`Python`文件的脚本。
+### macOS
 
-> **注意**: 该脚本现在会自动查找项目根目录下的 `venv` 环境。无需手动修改 python 路径，但请确保 `venv` 存在。
-
+GUI 点击“安装 / 更新定时任务”即可。手动安装：
 
 ```bash
-# 新建日志文件保存路径
-sudo mkdir -p /var/log/ustc_grab/{error,update,main}
+cd "$(git rev-parse --show-toplevel)"
+START_INTERVAL=120 bash scripts/macos/install_launchd.sh
 ```
 
-```bash
-# 添加执行权限
-sudo chmod +x scripts/ustc_grab_runner.sh
-```
-
-```bash
-# 添加服务
-# 1. 创建专用系统用户 (建议)
-sudo useradd -r -s /bin/false ustc-grab
-
-# 2. 移动项目代码到推荐目录 /etc (可选，也可以修改 service 文件中的路径)
-sudo mv ustc_grab_report_course /etc/
-cd /etc/ustc_grab_report_course
-
-# 3. 设置权限 (让 ustc-grab 用户拥有读写权限)
-sudo chown -R ustc-grab:ustc-grab .
-sudo chown -R ustc-grab:ustc-grab /var/log/ustc_grab
-
-# 4. 复制服务文件
-sudo cp scripts/ustc-grab.service /etc/systemd/system/
-
-# 5. 重新加载 systemd 配置
-sudo systemctl daemon-reload
-
-# 6. 启动服务
-sudo systemctl start ustc-grab.service
-
-# 7. 查看服务状态
-sudo systemctl status ustc-grab.service
-```
-
-```bash
-# 可选项
-# 启用开机启动 
-sudo systemctl enable ustc-grab.service
-# 重启服务 
-sudo systemctl restart ustc-grab.service
-# 关闭服务 
-sudo systemctl stop ustc-grab.service
-```
-
-```bash
-# 查看实时日志 (方式1: Systemd Journal)
-# 脚本已实现双重输出，您可以通过 journalctl 查看所有日志
-sudo journalctl -u ustc-grab.service -f
-
-# 查看实时日志 (方式2: 文件日志)
-# 日志同时也会保存在 /var/log/ustc_grab/ 下 (自动轮转清理，限制 100MB)
-tail -f /var/log/ustc_grab/main/$(date +%Y-%m-%d)*.txt
-```
-
-#### 3.4.3 macOS（launchd）
-
-macOS 的 TCC 会阻止后台任务读取桌面目录，因此不能直接把本目录挂到定时任务上。仓库提供了
-专用的部署脚本，会把运行时同步到 `~/Library/Application Support/USTC-Grab/report-course`：
-
-```bash
-bash scripts/macos/install_launchd.sh
-```
+- Label：`com.ustc.grab.report`
+- 运行时：`~/Library/Application Support/USTC-Grab/report-course`
+- 日志：`~/Library/Application Support/USTC-Grab/report-course/logs/main.log`
+- 查看状态：`launchctl print gui/$(id -u)/com.ustc.grab.report | grep -E 'state|last exit'`
+- 卸载：`bash scripts/macos/uninstall_launchd.sh`
 
 详见 [DEPLOY_MACOS.md](DEPLOY_MACOS.md)。
 
+### Windows
+
+GUI 点击“安装 / 更新定时任务”，或手动执行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\windows\install_task.ps1 -IntervalMinutes 2
+```
+
+- 任务名：`USTC-Grab-Report`
+- 可选保活任务：`USTC-Grab-Keepalive`（加 `-EnableKeepalive`）
+- 日志：`logs\main.log`
+- 查看任务：`Get-ScheduledTask -TaskName "USTC-Grab-Report"`
+- 卸载：`powershell -ExecutionPolicy Bypass -File scripts\windows\uninstall_task.ps1`
+
+详见 [DEPLOY_WINDOWS.md](DEPLOY_WINDOWS.md)。
+
+### 手动运行
+
+```bash
+python main.py             # 跑一轮检测
+python main_update_weu.py  # 跑一次保活（可选）
+python scripts/run_job.py main  # 带锁和日志的单轮入口
+```
+
+## 命令行工具
+
+```bash
+# 配置自检（可选 --network / --smtp）
+python scripts/macos/preflight.py --network --smtp
+
+# 首次开启成绩查询前预热，避免历史成绩被当成新成绩
+python scripts/macos/prime_grades.py
+
+# 直接跑一轮
+python main.py
+```
+
+## 目录结构
+
+```text
+.
+├── gui.py                     # GUI 入口
+├── main.py                    # 单轮检测
+├── main_update_weu.py         # 单次保活（可选）
+├── ustc_grab/                 # 核心包
+│   ├── client.py              # 请求、按应用缓存 _WEU、403 重试
+│   ├── config.py              # 配置读取
+│   ├── manager.py             # 筛选、排序、抢课、成绩
+│   ├── notification.py        # 邮件
+│   └── gui/                   # 本地 Web GUI（后端 + 前端）
+├── scripts/
+│   ├── macos/                 # launchd 安装、卸载、自检、预热
+│   ├── windows/               # 任务计划安装、卸载
+│   └── run_job.py             # 跨平台单轮入口
+├── templates/                 # 配置与排除列表模板
+├── data/                      # 运行时数据（课程缓存、成绩、排除列表）
+├── setup_windows.bat          # Windows 一键安装/启动
+└── start_gui.bat              # Windows 再次打开 GUI
+```
+
+`config.yml`、`data/weu_cache.json`、`logs/`、`venv/` 都是本地运行时内容，
+已在 `.gitignore` 中忽略，不会上传。
+
+## 常见问题
+
+**Q：平台返回 403 / “cookie 可能已过期”？**
+A：通常是 `_WEU` 属于别的应用。客户端会自动打开对应应用首页刷新并重试。如果 `GS_DBLOGIN_TOKEN`
+或 `GS_SESSIONID` 也过期，需要重新抓 Cookie 填入 GUI。
+
+**Q：SMTP 报 `535 authentication failed`？**
+A：填了登录密码而不是授权码，或授权码已失效。GUI 的“测试 SMTP”按钮只登录、不发信。
+
+**Q：一直显示 0 门可抢？**
+A：先点“报告预览”。可能是当前没有未来报告、名额已满、院系不在白名单，或报告时间已过。
+
+**Q：macOS 安装后没有运行？**
+A：检查 `launchctl print gui/$(id -u)/com.ustc.grab.report` 和
+`~/Library/Application Support/USTC-Grab/report-course/logs/main.log`。
+macOS 的 TCC 保护要求运行时放在 Application Support，不能放桌面。
+
+**Q：Windows 任务没有运行？**
+A：任务计划程序需要用户已登录；检查 `Get-ScheduledTask -TaskName "USTC-Grab-Report"`，
+确认项目目录没有被移动，并查看 `logs\main.log`。
+
+**Q：电脑睡眠时会跑吗？**
+A：不会。macOS 合盖/睡眠会暂停 launchd，Windows 睡眠也会暂停任务；唤醒后继续。
+
+**Q：保活任务是什么？**
+A：原项目每 30 分钟退掉一门真实课程再抢回来，借写操作刷新 `_WEU`。
+本项目已改为访问应用首页自动刷新，默认不安装保活任务，避免丢课风险。
+
+**Q：GUI 打不开 / 提示未授权？**
+A：回到启动 GUI 的终端，使用打印出来的带 `token` 的地址；GUI 只监听 `127.0.0.1`。
+
+## 安全与隐私
+
+- `config.yml` 包含平台 Cookie 和 SMTP 授权码，权限为 `600`，**不要提交到 Git**。
+- GUI 只监听 `127.0.0.1`，每次启动生成随机访问令牌，不向外部上传配置。
+- 日志不含 Cookie 或授权码；GUI 状态接口只返回密钥是否存在及长度。
+- 这些凭据等同于登录态和发信权限，请勿分享截图或配置文件。
+
+## 开发
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+python gui.py --help
+python gui.py --home /tmp/ustc-gui-demo --no-browser
+```
+
+GUI 使用 Python 标准库 `http.server` + 原生 HTML/CSS/JS，不需要 Node.js 或前端构建。
+
+## 致谢
+
+- 原项目：[1540975647/ustc_grab_report_course](https://github.com/1540975647/ustc_grab_report_course)
+- 本改造版：macOS / Windows 部署、GUI、按应用 `_WEU`、院系优先级与时间冲突、限流与邮件去重。
+
+## License
+
+[MIT](LICENSE)

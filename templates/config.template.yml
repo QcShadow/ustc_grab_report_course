@@ -64,7 +64,7 @@ data_raw:
     value: true
     linkOpt: AND
     builder: equal
-  pageSize: 100
+  pageSize: 999
   pageNumber: 1
 grade_data:
   querySetting: []
@@ -85,3 +85,7 @@ interval: 30
 max_grabs_per_cycle: 1
 # 两场报告开始时间相差小于该值（分钟）视为时间冲突
 conflict_window_minutes: 120
+# 定时任务检测间隔（秒），GUI 安装服务时使用
+schedule_interval_seconds: 120
+# 是否安装保活任务（会退掉再抢回 particular_course.BGBM）
+enable_keepalive: false
