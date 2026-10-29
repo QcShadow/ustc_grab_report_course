@@ -39,6 +39,8 @@ pip install -r requirements.txt
 python gui.py
 ```
 
+也可以双击项目根目录的 `start_gui.command` 启动。
+
 GUI 会在浏览器打开。配置与数据保存在：
 
 ```text
@@ -203,7 +205,8 @@ python main.py
 ├── templates/                 # 配置与排除列表模板
 ├── data/                      # 运行时数据（课程缓存、成绩、排除列表）
 ├── setup_windows.bat          # Windows 一键安装/启动
-└── start_gui.bat              # Windows 再次打开 GUI
+├── start_gui.bat              # Windows 再次打开 GUI
+└── start_gui.command          # macOS 双击启动 GUI
 ```
 
 `config.yml`、`data/weu_cache.json`、`logs/`、`venv/` 都是本地运行时内容，

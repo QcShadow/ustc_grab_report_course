@@ -32,6 +32,8 @@ pip install -r requirements.txt
 python gui.py
 ```
 
+也可以双击项目根目录的 `start_gui.command` 启动。
+
 浏览器会打开 `http://127.0.0.1:<随机端口>/?token=...`。按 GUI 提示：
 
 1. 填写邮箱、SMTP 授权码、平台 Cookie
