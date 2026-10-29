@@ -7,6 +7,19 @@ let selectedData = null;
 let messageTimer = null;
 
 const $ = (id) => document.getElementById(id);
+const qsa = (selector) => Array.from(document.querySelectorAll(selector));
+
+function switchPane(name) {
+  qsa(".seg-btn").forEach((button) => {
+    const active = button.dataset.pane === name;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-selected", active ? "true" : "false");
+    button.tabIndex = active ? 0 : -1;
+  });
+  qsa(".config-pane").forEach((pane) => {
+    pane.classList.toggle("active", pane.id === `pane-${name}`);
+  });
+}
 
 function esc(value) {
   return String(value == null ? "" : value).replace(/[&<>"']/g, (ch) => ({
@@ -151,6 +164,7 @@ function renderState(data) {
   $("enable-grade-check").checked = Boolean(data.enable_grade_check);
   $("schedule-interval").value = data.schedule_interval_seconds;
   $("config-path").textContent = data.config_path || "—";
+  $("config-summary").textContent = `${departments.length} 个院系 · 每 ${data.schedule_interval_seconds} 秒`;
 
   renderDepartments();
   renderService();
@@ -263,6 +277,12 @@ async function saveConfig(showMessage = true) {
     renderState(data);
     if (showMessage) showMessage("配置已保存", "ok");
     return data;
+  } catch (error) {
+    const message = error.message || "";
+    if (/院系/.test(message)) switchPane("departments");
+    else if (/间隔|成绩/.test(message)) switchPane("settings");
+    else if (/邮箱|SMTP|授权码|Cookie|密码/.test(message)) switchPane("account");
+    throw error;
   } finally {
     setBusy(button, false);
   }
@@ -350,6 +370,18 @@ async function toggleService() {
 }
 
 function bind() {
+  qsa(".seg-btn").forEach((button) => {
+    button.addEventListener("click", () => switchPane(button.dataset.pane));
+    button.addEventListener("keydown", (event) => {
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      event.preventDefault();
+      const buttons = qsa(".seg-btn");
+      const index = buttons.indexOf(button);
+      const next = buttons[(index + (event.key === "ArrowRight" ? 1 : -1) + buttons.length) % buttons.length];
+      switchPane(next.dataset.pane);
+      next.focus();
+    });
+  });
   $("save-config").addEventListener("click", () => saveConfig(true).catch((error) => showMessage(error.message, "err", false)));
   $("service-toggle").addEventListener("click", toggleService);
   $("refresh-selected").addEventListener("click", () => refreshSelected(false));
@@ -367,6 +399,8 @@ function bind() {
 
 async function init() {
   bind();
+  const requestedPane = new URLSearchParams(window.location.search).get("pane");
+  switchPane(["account", "departments", "settings"].includes(requestedPane) ? requestedPane : "account");
   try {
     const data = await api("/api/state");
     renderState(data);

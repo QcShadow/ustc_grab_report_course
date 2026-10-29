@@ -33,66 +33,75 @@
         <section class="panel config-panel">
           <div class="panel-head">
             <h2>自动抢课配置</h2>
+            <span id="config-summary" class="config-summary"></span>
           </div>
 
-          <section class="form-section">
-            <h3>邮箱通知</h3>
-            <div class="grid-2">
-              <label>发件邮箱
-                <input id="email-sender" type="email" placeholder="you@163.com" autocomplete="off">
-              </label>
-              <label>收件邮箱
-                <input id="email-receiver" type="email" placeholder="you@163.com" autocomplete="off">
-              </label>
-              <label>SMTP 服务器
-                <input id="smtp-server" placeholder="smtp.163.com" autocomplete="off">
-              </label>
-              <label>端口
-                <input id="smtp-port" type="number" placeholder="465">
-              </label>
-            </div>
-            <label>SMTP 授权码
-              <span id="hint-auth" class="secret"></span>
-              <input id="smtp-auth" type="password" autocomplete="new-password">
-            </label>
-            <p class="hint">163/QQ 邮箱填“授权码”，不是网页登录密码。</p>
-          </section>
+          <div class="segmented" role="tablist" aria-label="配置分组">
+            <button id="tab-account" class="seg-btn active" data-pane="account" type="button" role="tab" aria-selected="true" aria-controls="pane-account">账号与通知</button>
+            <button id="tab-departments" class="seg-btn" data-pane="departments" type="button" role="tab" aria-selected="false" aria-controls="pane-departments">院系优先级</button>
+            <button id="tab-settings" class="seg-btn" data-pane="settings" type="button" role="tab" aria-selected="false" aria-controls="pane-settings">基本设置</button>
+          </div>
 
-          <section class="form-section">
-            <h3>平台登录</h3>
-            <div class="grid-2">
-              <label>GS_DBLOGIN_TOKEN
-                <span id="hint-GS_DBLOGIN_TOKEN" class="secret"></span>
-                <input id="cookie-GS_DBLOGIN_TOKEN" type="password" autocomplete="new-password">
-              </label>
-              <label>GS_SESSIONID
-                <span id="hint-GS_SESSIONID" class="secret"></span>
-                <input id="cookie-GS_SESSIONID" type="password" autocomplete="new-password">
-              </label>
-              <label>_WEU
-                <span id="hint-_WEU" class="secret"></span>
-                <input id="cookie-_WEU" type="password" autocomplete="new-password">
-              </label>
-              <label>route
-                <span id="hint-route" class="secret"></span>
-                <input id="cookie-route" type="password" autocomplete="new-password">
-              </label>
-            </div>
-            <p class="hint">Chrome 登录平台 → F12 → Network → 任意 gsapp 请求 → Request Headers → Cookie。</p>
-          </section>
+          <div id="pane-account" class="config-pane active" role="tabpanel" aria-labelledby="tab-account">
+            <div class="account-grid">
+              <section class="form-section">
+                <h3>邮箱通知</h3>
+                <div class="grid-2">
+                  <label>发件邮箱
+                    <input id="email-sender" type="email" placeholder="you@163.com" autocomplete="off">
+                  </label>
+                  <label>收件邮箱
+                    <input id="email-receiver" type="email" placeholder="you@163.com" autocomplete="off">
+                  </label>
+                  <label>SMTP 服务器
+                    <input id="smtp-server" placeholder="smtp.163.com" autocomplete="off">
+                  </label>
+                  <label>端口
+                    <input id="smtp-port" type="number" placeholder="465">
+                  </label>
+                </div>
+                <label>SMTP 授权码
+                  <span id="hint-auth" class="secret"></span>
+                  <input id="smtp-auth" type="password" autocomplete="new-password">
+                </label>
+                <p class="hint">163/QQ 邮箱填“授权码”，不是网页登录密码。</p>
+              </section>
 
-          <section class="form-section">
-            <h3>院系优先级</h3>
-            <p class="hint">越靠前优先级越高；时间冲突时优先选靠前的院系。</p>
+              <section class="form-section">
+                <h3>平台登录</h3>
+                <div class="grid-2">
+                  <label>GS_DBLOGIN_TOKEN
+                    <span id="hint-GS_DBLOGIN_TOKEN" class="secret"></span>
+                    <input id="cookie-GS_DBLOGIN_TOKEN" type="password" autocomplete="new-password">
+                  </label>
+                  <label>GS_SESSIONID
+                    <span id="hint-GS_SESSIONID" class="secret"></span>
+                    <input id="cookie-GS_SESSIONID" type="password" autocomplete="new-password">
+                  </label>
+                  <label>_WEU
+                    <span id="hint-_WEU" class="secret"></span>
+                    <input id="cookie-_WEU" type="password" autocomplete="new-password">
+                  </label>
+                  <label>route
+                    <span id="hint-route" class="secret"></span>
+                    <input id="cookie-route" type="password" autocomplete="new-password">
+                  </label>
+                </div>
+                <p class="hint">Chrome 登录平台 → F12 → Network → 任意 gsapp 请求 → Request Headers → Cookie。</p>
+              </section>
+            </div>
+          </div>
+
+          <div id="pane-departments" class="config-pane" role="tabpanel" aria-labelledby="tab-departments">
+            <p class="hint pane-hint">越靠前优先级越高；时间冲突时优先选靠前的院系。</p>
             <div id="departments-list" class="dept-list"></div>
             <div class="inline">
               <select id="department-select" aria-label="选择要添加的院系"></select>
               <button id="add-department" class="btn" type="button">添加院系</button>
             </div>
-          </section>
+          </div>
 
-          <section class="form-section">
-            <h3>基本设置</h3>
+          <div id="pane-settings" class="config-pane" role="tabpanel" aria-labelledby="tab-settings">
             <label class="switch-row">
               <span>查询成绩（每轮多一次请求）</span>
               <input id="enable-grade-check" type="checkbox">
@@ -101,7 +110,8 @@
             <label>检测间隔（秒）
               <input id="schedule-interval" type="number" min="30" step="30">
             </label>
-          </section>
+            <p class="hint">修改检测间隔后，点右上角开关重新应用。</p>
+          </div>
 
           <div class="save-bar">
             <button id="save-config" class="btn primary" type="button">保存配置</button>

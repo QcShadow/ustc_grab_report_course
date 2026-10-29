@@ -156,7 +156,6 @@ code, pre, .mono {
   background: var(--border-strong);
   position: relative;
   cursor: pointer;
-  transition: background-color 0.18s ease;
   flex: 0 0 auto;
 }
 .toggle .toggle-knob {
@@ -168,7 +167,6 @@ code, pre, .mono {
   border-radius: 50%;
   background: #fffdf8;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
-  transition: transform 0.18s ease;
 }
 .toggle.on { background: var(--accent); }
 .toggle.on .toggle-knob { transform: translateX(20px); }
@@ -213,6 +211,56 @@ main {
 }
 
 .config-panel { padding: 24px 26px 0; }
+
+.config-summary {
+  color: var(--muted);
+  font-size: 11.5px;
+  white-space: nowrap;
+  padding-top: 3px;
+}
+
+.segmented {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  margin-bottom: 18px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+.seg-btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 7px 12px;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+.seg-btn:hover { color: var(--ink-soft); }
+.seg-btn.active {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgba(29, 27, 23, 0.06);
+}
+.seg-btn:focus-visible { outline: none; box-shadow: var(--focus); }
+
+.config-pane { display: none; }
+.config-pane.active { display: block; }
+
+.account-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 26px;
+}
+.account-grid .form-section h3 { margin-top: 2px; }
+.account-grid .grid-2 { grid-template-columns: 1fr; }
+
+.pane-hint { margin: 0 0 12px; }
 
 .panel-head {
   display: flex;
@@ -446,7 +494,22 @@ select {
 .link:focus-visible { outline: none; box-shadow: var(--focus); border-radius: 4px; }
 
 /* ---------- departments ---------- */
-.dept-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.dept-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+  max-height: 380px;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+.dept-list::-webkit-scrollbar { width: 8px; }
+.dept-list::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 4px;
+}
 
 .dept-row {
   display: grid;
@@ -631,6 +694,11 @@ select {
   .selected-list { max-height: 360px; }
 }
 
+@media (max-width: 860px) {
+  .account-grid { grid-template-columns: 1fr; gap: 0; }
+  .account-grid .form-section + .form-section h3 { margin-top: 26px; }
+}
+
 @media (max-width: 720px) {
   .grid-2 { grid-template-columns: 1fr; }
   .topbar { padding: 24px 18px 12px; }
@@ -644,6 +712,10 @@ select {
   .topbar { flex-direction: column; align-items: flex-start; gap: 14px; }
   .service-control { width: 100%; justify-content: space-between; }
   .brand-text h1 { font-size: 24px; }
+  .segmented { display: flex; width: 100%; }
+  .seg-btn { flex: 1; padding: 7px 6px; font-size: 11.5px; }
+  .config-summary { display: none; }
+  .dept-list { max-height: 300px; }
   .dept-row { grid-template-columns: 28px 1fr; }
   .dept-actions { grid-column: 2; justify-content: flex-end; }
   .inline select { flex-basis: 100%; }

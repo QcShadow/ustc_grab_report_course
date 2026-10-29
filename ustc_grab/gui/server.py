@@ -145,9 +145,13 @@ class Handler(BaseHTTPRequestHandler):
     def _redirect_with_cookie(self) -> None:
         query = parse_qs(urlparse(self.path).query)
         tab = (query.get("tab") or [""])[0]
-        location = "/"
+        pane = (query.get("pane") or [""])[0]
+        params = []
         if tab in ("overview", "config", "preview", "service"):
-            location = "/?tab=" + tab
+            params.append("tab=" + tab)
+        if pane in ("account", "departments", "settings"):
+            params.append("pane=" + pane)
+        location = "/" + ("?" + "&".join(params) if params else "")
         self.send_response(302)
         self.send_header(
             "Set-Cookie",
