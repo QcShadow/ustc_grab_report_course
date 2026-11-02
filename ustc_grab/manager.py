@@ -284,7 +284,16 @@ class CourseManager:
         if isinstance(post_result, str):
             return any(
                 hint in post_result
-                for hint in ("登录", "超时", "403", "Client Error", "Forbidden")
+                for hint in (
+                    "登录",
+                    "超时",
+                    "会话",
+                    "401",
+                    "403",
+                    "Unauthorized",
+                    "Client Error",
+                    "Forbidden",
+                )
             )
         return False
 
