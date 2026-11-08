@@ -37,3 +37,6 @@ check_*.py
 # Runtime state
 /data/weu_cache.json
 /data/*.tmp
+
+# Dedicated browser profile (contains login cookies)
+browser-profile/

@@ -735,3 +735,15 @@ select {
     scroll-behavior: auto !important;
   }
 }
+
+/* ---------- dedicated browser login ---------- */
+.login-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.login-row .hint { margin: 0; }
+#browser-login-status.ok { color: var(--success); }
+#browser-login-status.err { color: var(--danger); }

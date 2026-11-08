@@ -5,6 +5,8 @@ let state = null;
 let departments = [];
 let selectedData = null;
 let messageTimer = null;
+let browserLoginTimer = null;
+let browserLoginActive = false;
 
 const $ = (id) => document.getElementById(id);
 const qsa = (selector) => Array.from(document.querySelectorAll(selector));
@@ -369,6 +371,104 @@ async function toggleService() {
   }
 }
 
+const BROWSER_LOGIN_FINAL = new Set(["success", "error", "timeout", "cancelled", "closed"]);
+
+function setBrowserLoginStatus(text, cls = "") {
+  const node = $("browser-login-status");
+  if (!node) return;
+  node.textContent = text;
+  node.classList.remove("ok", "err");
+  if (cls) node.classList.add(cls);
+}
+
+function resetBrowserLogin() {
+  browserLoginActive = false;
+  if (browserLoginTimer) {
+    clearTimeout(browserLoginTimer);
+    browserLoginTimer = null;
+  }
+  const button = $("browser-login");
+  if (button) {
+    button.disabled = false;
+    button.textContent = "打开登录窗口";
+  }
+}
+
+function scheduleBrowserLoginPoll() {
+  if (!browserLoginActive) return;
+  if (browserLoginTimer) clearTimeout(browserLoginTimer);
+  browserLoginTimer = setTimeout(pollBrowserLogin, 1500);
+}
+
+async function applyBrowserLogin(data) {
+  const status = data.status || "idle";
+  const message = data.message || "";
+  const isError = status === "error" || status === "timeout";
+  setBrowserLoginStatus(message, status === "success" ? "ok" : (isError ? "err" : ""));
+
+  if (status === "success") {
+    resetBrowserLogin();
+    showMessage(message || "登录已更新", "ok");
+    try {
+      const fresh = await api("/api/state");
+      renderState(fresh);
+    } catch (error) {
+      // The cookie was already saved; a state refresh failure is non-fatal.
+    }
+    await refreshSelected(true);
+    return;
+  }
+
+  if (BROWSER_LOGIN_FINAL.has(status)) {
+    resetBrowserLogin();
+    if (isError || status === "closed") showMessage(message, "err", false);
+    return;
+  }
+
+  browserLoginActive = true;
+  const button = $("browser-login");
+  if (button) button.textContent = "取消登录";
+  scheduleBrowserLoginPoll();
+}
+
+async function pollBrowserLogin() {
+  browserLoginTimer = null;
+  if (!browserLoginActive) return;
+  try {
+    const data = await api("/api/login/browser/status");
+    await applyBrowserLogin(data);
+  } catch (error) {
+    resetBrowserLogin();
+    setBrowserLoginStatus(error.message, "err");
+  }
+}
+
+async function toggleBrowserLogin() {
+  if (browserLoginActive) {
+    setBrowserLoginStatus("正在取消登录…");
+    try {
+      const data = await api("/api/login/browser/cancel", { method: "POST", body: {} });
+      await applyBrowserLogin(data);
+    } catch (error) {
+      resetBrowserLogin();
+      setBrowserLoginStatus(error.message, "err");
+    }
+    return;
+  }
+
+  browserLoginActive = true;
+  const button = $("browser-login");
+  if (button) button.textContent = "取消登录";
+  setBrowserLoginStatus("正在打开独立登录窗口…");
+  try {
+    const data = await api("/api/login/browser/start", { method: "POST", body: {} });
+    await applyBrowserLogin(data);
+  } catch (error) {
+    resetBrowserLogin();
+    setBrowserLoginStatus(error.message, "err");
+  }
+}
+
 function bind() {
   qsa(".seg-btn").forEach((button) => {
     button.addEventListener("click", () => switchPane(button.dataset.pane));
@@ -383,6 +483,7 @@ function bind() {
     });
   });
   $("save-config").addEventListener("click", () => saveConfig(true).catch((error) => showMessage(error.message, "err", false)));
+  $("browser-login").addEventListener("click", toggleBrowserLogin);
   $("service-toggle").addEventListener("click", toggleService);
   $("refresh-selected").addEventListener("click", () => refreshSelected(false));
   $("add-department").addEventListener("click", addDepartment);

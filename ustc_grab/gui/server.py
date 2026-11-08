@@ -19,6 +19,7 @@ from typing import Any, Dict, Optional, Tuple
 from urllib.parse import parse_qs, unquote, urlparse
 
 from . import checks
+from .login_browser import BrowserLoginManager
 from .config_store import (
     apply_payload,
     ensure_home,
@@ -45,7 +46,14 @@ class GuiServer(ThreadingHTTPServer):
     def __init__(self, address, handler, home: Path, token: str):
         self.home = home
         self.token = token
+        self.login_manager = BrowserLoginManager(home)
         super().__init__(address, handler)
+
+    def server_close(self) -> None:
+        try:
+            self.login_manager.shutdown()
+        finally:
+            super().server_close()
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -197,6 +205,13 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_error_json(f"{type(exc).__name__}: {exc}", 500)
             return
 
+        if path == "/api/login/browser/status":
+            if not self._authorized():
+                self._send_error_json("未授权", 401)
+                return
+            self._send_json({"ok": True, **self.server.login_manager.status()})  # type: ignore[attr-defined]
+            return
+
         if path == "/api/logs":
             if not self._authorized():
                 self._send_error_json("未授权", 401)
@@ -236,6 +251,14 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         try:
+            if path == "/api/login/browser/start":
+                self._send_json({"ok": True, **self.server.login_manager.start()})  # type: ignore[attr-defined]
+                return
+
+            if path == "/api/login/browser/cancel":
+                self._send_json({"ok": True, **self.server.login_manager.cancel()})  # type: ignore[attr-defined]
+                return
+
             if path == "/api/config":
                 state = apply_payload(self.home, payload)
                 state["ok"] = True

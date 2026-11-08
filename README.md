@@ -18,6 +18,7 @@ USTC 研究生综合平台学术报告选课助手，基于
 ## 功能
 
 - **图形界面**：本地浏览器打开，配置分“账号与通知 / 院系优先级 / 基本设置”三段。
+- **GUI 内登录**：Cookie 过期时可打开独立 Chrome/Edge 窗口，自动读取并验证新 Cookie，不影响日常浏览器。
 - **跨平台**：macOS 使用 launchd，Windows 使用任务计划程序；核心逻辑纯 Python。
 - **按应用缓存 `_WEU`**：平台每个应用的 `_WEU` 不同，客户端自动获取、缓存并在失效时重试。
 - **院系优先级**：按你指定的院系顺序排序；时间冲突时优先靠前的院系。
@@ -27,7 +28,7 @@ USTC 研究生综合平台学术报告选课助手，基于
 
 ## 快速开始
 
-要求：Python **3.9+**，能访问 `https://yjs1.ustc.edu.cn`。
+要求：Python **3.9+**，能访问 `https://yjs1.ustc.edu.cn`。GUI 内登录窗口需要已安装 Chrome 或 Edge。
 
 ### macOS
 
@@ -40,6 +41,12 @@ python3 -m venv venv
 ```
 
 也可以双击项目根目录的 `start_gui.command`。
+
+从旧版本更新后，先重新安装依赖（登录窗口新增了 `websocket-client`）：
+
+```bash
+./venv/bin/pip install -r requirements.txt
+```
 
 配置与数据保存在：
 
@@ -64,7 +71,7 @@ Windows 的配置与数据就在项目目录下。
    - 163：`smtp.163.com:465`
    - QQ：`smtp.qq.com:465`
    - 授权码不是邮箱登录密码。
-2. 填平台 Cookie：Chrome 登录 → F12 → Network → 任意 `gsapp` 请求 → Request Headers → `Cookie`。
+2. 填平台 Cookie：可以点“打开登录窗口”自动获取；也可以 Chrome 登录 → F12 → Network → 任意 `gsapp` 请求 → Request Headers → `Cookie`。
 3. 切换到“院系优先级”，调整顺序。越靠前优先级越高。
 4. 切换到“基本设置”，设置检测间隔和是否查询成绩。
 5. 点 **保存配置**。
@@ -72,6 +79,18 @@ Windows 的配置与数据就在项目目录下。
 7. 右侧“已选报告”会自动刷新，也可以手动刷新。
 
 配置分段切换不会丢失未保存的输入。关闭右上角开关即停止抢课，配置和数据会保留。
+
+### Cookie 过期后重新登录
+
+“账号与通知”里有 **打开登录窗口**：
+
+1. 点击后，GUI 用独立配置目录启动 Chrome 或 Edge，打开平台登录页。
+2. 在窗口里完成登录；CAS、验证码或二次验证都由你操作。
+3. GUI 自动读取该窗口的 Cookie，并用已选报告接口验证；有效后写入 `config.yml`，关闭窗口。
+4. 定时任务下一轮自动恢复；之前的“Cookie 过期”标记会清除。
+
+这个登录窗口使用 `browser-profile/`，和日常浏览器完全隔离：它不会读取日常浏览器的 Cookie，
+也不会保存账号密码。需要电脑安装 Chrome 或 Edge；没有的话仍可手动粘贴 Cookie。
 
 ## 配置
 
@@ -288,9 +307,14 @@ powershell -ExecutionPolicy Bypass -File scripts\windows\install_task.ps1 -Inter
 - GUI 只监听 `127.0.0.1`，每次启动生成随机访问令牌，不向外部上传配置。
 - 日志不含 Cookie 或授权码；GUI 状态接口只返回密钥是否存在及长度。
 - 这些凭据等同于登录态和发信权限，请勿分享配置文件、截图或带 token 的地址。
+- `browser-profile/` 里保存独立登录窗口的会话，权限为 `700`，不要分享或提交；它和日常浏览器是分开的。
 - 建议使用专门的收件邮箱；不要把邮箱登录密码填进 SMTP 授权码字段。
 
 ## 常见问题
+
+**打开登录窗口没反应 / 找不到浏览器？**
+需要安装 Chrome 或 Edge。登录窗口使用独立的 `browser-profile/`，不会影响日常浏览器；
+如果仍然打不开，先关闭残留的登录窗口后重试，或继续手动粘贴 Cookie。
 
 **平台返回 403 / “cookie 可能已过期”？**
 通常是 `_WEU` 属于别的应用，客户端会自动刷新并重试。如果 `GS_DBLOGIN_TOKEN` 或
@@ -338,7 +362,7 @@ macOS 的 TCC 保护要求运行时放在 Application Support，不能放桌面�
 │   ├── config.py              # 配置读取
 │   ├── manager.py             # 筛选、排序、抢课、成绩
 │   ├── notification.py        # 邮件
-│   └── gui/                   # 本地 Web GUI（后端 + 前端）
+│   └── gui/                   # 本地 Web GUI（含独立浏览器登录）
 ├── scripts/
 │   ├── macos/                 # launchd 安装、卸载、自检、预热
 │   ├── windows/               # 任务计划安装、卸载
