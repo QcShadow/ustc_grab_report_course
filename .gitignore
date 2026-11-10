@@ -40,3 +40,6 @@ check_*.py
 
 # Dedicated browser profile (contains login cookies)
 browser-profile/
+
+# Update check cache
+/data/update_check.json

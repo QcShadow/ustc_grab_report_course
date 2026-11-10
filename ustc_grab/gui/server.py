@@ -20,6 +20,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 from . import checks
 from .login_browser import BrowserLoginManager
+from .update_check import check_update
 from .config_store import (
     apply_payload,
     ensure_home,
@@ -210,6 +211,15 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_error_json("未授权", 401)
                 return
             self._send_json({"ok": True, **self.server.login_manager.status()})  # type: ignore[attr-defined]
+            return
+
+        if path == "/api/update/check":
+            if not self._authorized():
+                self._send_error_json("未授权", 401)
+                return
+            query = parse_qs(parsed.query)
+            force = (query.get("force") or [""])[0] in ("1", "true", "yes")
+            self._send_json(check_update(self.home, force=force))
             return
 
         if path == "/api/logs":

@@ -682,7 +682,24 @@ select {
   overflow-wrap: anywhere;
 }
 .footer-dot { opacity: 0.5; }
-.footer .link { margin-left: auto; }
+.footer #shutdown-btn { margin-left: auto; }
+.version-label {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10.5px;
+  color: var(--muted);
+}
+.update-status:empty { display: none; }
+.update-status a {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-size: 10.5px;
+  font-weight: 650;
+  text-decoration: none;
+}
+.update-status a:hover { text-decoration: underline; }
 
 .hidden { display: none !important; }
 

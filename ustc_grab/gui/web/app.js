@@ -469,6 +469,31 @@ async function toggleBrowserLogin() {
   }
 }
 
+async function checkUpdate(force = false) {
+  const button = $("check-update");
+  if (force) setBusy(button, true, "检查中…");
+  try {
+    const data = await api(`/api/update/check${force ? "?force=1" : ""}`);
+    $("version-label").textContent = `v${data.current || "—"}`;
+    const status = $("update-status");
+    if (data.has_update && data.latest) {
+      status.innerHTML = `<a href="${esc(data.url)}" target="_blank" rel="noopener">发现 v${esc(data.latest)}</a>`;
+      if (!force && $("message").classList.contains("hidden")) showMessage(`发现新版本 v${data.latest}，页脚可查看`, "info", false);
+    } else {
+      status.textContent = "";
+      if (force) {
+        if (data.error) showMessage(`检查更新失败：${data.error}`, "err", false);
+        else showMessage("已是最新版本", "ok");
+      }
+    }
+    if (force && data.has_update) showMessage(`发现新版本 v${data.latest}`, "info", false);
+  } catch (error) {
+    if (force) showMessage(`检查更新失败：${error.message}`, "err", false);
+  } finally {
+    if (force) setBusy(button, false);
+  }
+}
+
 function bind() {
   qsa(".seg-btn").forEach((button) => {
     button.addEventListener("click", () => switchPane(button.dataset.pane));
@@ -484,6 +509,7 @@ function bind() {
   });
   $("save-config").addEventListener("click", () => saveConfig(true).catch((error) => showMessage(error.message, "err", false)));
   $("browser-login").addEventListener("click", toggleBrowserLogin);
+  $("check-update").addEventListener("click", () => checkUpdate(true));
   $("service-toggle").addEventListener("click", toggleService);
   $("refresh-selected").addEventListener("click", () => refreshSelected(false));
   $("add-department").addEventListener("click", addDepartment);
@@ -510,6 +536,7 @@ async function init() {
     return;
   }
   await refreshSelected(true);
+  checkUpdate(false);
 }
 
 document.addEventListener("DOMContentLoaded", init);

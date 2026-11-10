@@ -19,6 +19,7 @@ USTC 研究生综合平台学术报告选课助手，基于
 
 - **图形界面**：本地浏览器打开，配置分“账号与通知 / 院系优先级 / 基本设置”三段。
 - **GUI 内登录**：Cookie 过期时可打开独立 Chrome/Edge 窗口，自动读取并验证新 Cookie，不影响日常浏览器。
+- **自动检查更新**：GUI 页脚显示版本，启动时检查 GitHub 新版本；发现更新时给出 Release 链接。
 - **跨平台**：macOS 使用 launchd，Windows 使用任务计划程序；核心逻辑纯 Python。
 - **按应用缓存 `_WEU`**：平台每个应用的 `_WEU` 不同，客户端自动获取、缓存并在失效时重试。
 - **院系优先级**：按你指定的院系顺序排序；时间冲突时优先靠前的院系。
@@ -91,6 +92,21 @@ Windows 的配置与数据就在项目目录下。
 
 这个登录窗口使用 `browser-profile/`，和日常浏览器完全隔离：它不会读取日常浏览器的 Cookie，
 也不会保存账号密码。需要电脑安装 Chrome 或 Edge；没有的话仍可手动粘贴 Cookie。
+
+### 版本与更新
+
+GUI 页脚显示当前版本，打开页面时会自动检查 GitHub Release（结果缓存 6 小时）；也可以点“检查更新”手动检查。
+发现新版本时，页脚会出现版本链接，点击打开 GitHub Release 页面。
+
+检测只做提示，**不会自动覆盖本地代码或配置**。更新时手动拉取代码并重新安装依赖：
+
+```bash
+git pull
+./venv/bin/pip install -r requirements.txt
+```
+
+然后重启 GUI。macOS 如果使用 launchd 运行目录，重新执行 `scripts/macos/install_launchd.sh` 同步代码；
+Windows 任务计划使用项目目录，重启任务即可。
 
 ## 配置
 
@@ -307,6 +323,7 @@ powershell -ExecutionPolicy Bypass -File scripts\windows\install_task.ps1 -Inter
 - GUI 只监听 `127.0.0.1`，每次启动生成随机访问令牌，不向外部上传配置。
 - 日志不含 Cookie 或授权码；GUI 状态接口只返回密钥是否存在及长度。
 - 这些凭据等同于登录态和发信权限，请勿分享配置文件、截图或带 token 的地址。
+- 版本检查只向 GitHub 请求 Release/VERSION，不上传配置、Cookie 或日志。
 - `browser-profile/` 里保存独立登录窗口的会话，权限为 `700`，不要分享或提交；它和日常浏览器是分开的。
 - 建议使用专门的收件邮箱；不要把邮箱登录密码填进 SMTP 授权码字段。
 
